@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOP Fussball-Turnier</title>
+<style>
+  :root {
+    --bg: #0a1628;
+    --surface: #111d32;
+    --surface2: #182842;
+    --border: #243656;
+    --green: #2ecc71;
+    --green-dark: #1a7a42;
+    --field: #2d8a4e;
+    --field-line: rgba(255,255,255,0.25);
+    --gold: #f1c40f;
+    --red: #e74c3c;
+    --blue: #3498db;
+    --text: #ecf0f1;
+    --text2: #7f8c9b;
+    --white: #fff;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-size: 20px;
+    background: linear-gradient(135deg, var(--green), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .phase-indicator {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .phase-dot {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    border: 2px solid var(--border);
+    color: var(--text2);
+    transition: all 0.3s;
+  }
+
+  .phase-dot.active { border-color: var(--green); color: var(--green); background: rgba(46,204,113,0.1); }
+  .phase-dot.done { border-color: var(--gold); color: var(--gold); background: rgba(241,196,15,0.1); }
+
+  /* ===== CODE SIDEBAR ===== */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 6px 1fr;
+    height: calc(100vh - 61px);
+    overflow: hidden;
+  }
+
+  .code-sidebar {
+    background: var(--surface);
+    border-right: none;
+    overflow-y: auto;
+    padding: 16px;
+    font-size: 13px;
+    min-width: 0;
+  }
+
+  .splitter {
+    background: var(--border);
+    cursor: col-resize;
+    position: relative;
+    z-index: 20;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .splitter:hover, .splitter.dragging {
+    background: var(--blue);
+  }
+
+  .splitter::after {
+    content: '';
+    width: 2px;
+    height: 30px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 1px;
+  }
+
+  .splitter:hover::after, .splitter.dragging::after {
+    background: rgba(255,255,255,0.5);
+  }
+
+  .btn-autoplay {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-autoplay.active {
+    background: var(--green);
+    color: #fff;
+  }
+
+  .btn-autoplay.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.5);
+    animation: autoplayBar 2s linear infinite;
+  }
+
+  @keyframes autoplayBar {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  .code-sidebar h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text2);
+    margin-bottom: 10px;
+  }
+
+  .code-block {
+    background: #0d1520;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'Cascadia Code','Fira Code','Consolas', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    white-space: pre;
+    margin-bottom: 14px;
+    overflow-x: auto;
+  }
+
+  .kw { color: #c792ea; }
+  .tp { color: #82aaff; }
+  .st { color: #c3e88d; }
+  .cm { color: #546e7a; font-style: italic; }
+  .nr { color: #f78c6c; }
+  .hl { background: rgba(130,170,255,0.1); display: inline; border-radius: 2px; }
+
+  .class-label {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .class-label.turnier-c { background: rgba(241,196,15,0.15); color: var(--gold); border: 1px solid rgba(241,196,15,0.3); }
+  .class-label.team-c { background: rgba(52,152,219,0.15); color: var(--blue); border: 1px solid rgba(52,152,219,0.3); }
+  .class-label.spieler-c { background: rgba(46,204,113,0.15); color: var(--green); border: 1px solid rgba(46,204,113,0.3); }
+
+  /* ===== MAIN CONTENT ===== */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  /* ===== PHASE 1: SETUP ===== */
+  .setup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .team-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s;
+    animation: cardIn 0.3s ease-out;
+  }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(15px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .team-card:hover { border-color: var(--blue); }
+
+  .team-card-header {
+    padding: 12px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .team-name {
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+  }
+
+  .team-name:focus {
+    border-bottom: 1px solid var(--blue);
+  }
+
+  .team-strength {
+    font-size: 13px;
+    color: var(--gold);
+    font-weight: 700;
+    white-space: nowrap;
+    margin-left: 8px;
+  }
+
+  .player-list {
+    padding: 6px 0;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .player-row {
+    display: flex;
+    align-items: center;
+    padding: 4px 14px;
+    font-size: 13px;
+    gap: 8px;
+    transition: background 0.15s;
+  }
+
+  .player-row:hover { background: rgba(255,255,255,0.03); }
+
+  .player-row .idx {
+    color: var(--text2);
+    font-size: 11px;
+    width: 18px;
+    text-align: right;
+  }
+
+  .player-row input.pname {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+    padding: 2px 0;
+  }
+
+  .player-row input.pname:focus {
+    border-bottom: 1px solid var(--green);
+  }
+
+  .str-bar-bg {
+    width: 50px; height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .str-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+
+  .player-row .str-val {
+    width: 28px;
+    font-weight: 700;
+    font-size: 12px;
+    text-align: right;
+    font-family: monospace;
+  }
+
+  .player-row input.str-input {
+    width: 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    text-align: center;
+    padding: 2px;
+    outline: none;
+    font-family: monospace;
+  }
+
+  .player-row input.str-input:focus { border-color: var(--green); }
+
+  .add-team-card {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text2);
+    gap: 8px;
+  }
+
+  .add-team-card:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(46,204,113,0.04);
+  }
+
+  .add-team-card .plus { font-size: 36px; font-weight: 300; }
+  .add-team-card span { font-size: 13px; }
+
+  /* ===== BOTTOM BAR ===== */
+  .bottom-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn {
+    padding: 9px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-green:hover:not(:disabled) { background: #27ae60; }
+  .btn-gold { background: var(--gold); color: #000; }
+  .btn-gold:hover:not(:disabled) { background: #d4ac0d; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-red:hover:not(:disabled) { background: #c0392b; }
+  .btn-outline { background: none; border: 1px solid var(--border); color: var(--text2); }
+  .btn-outline:hover { border-color: var(--text); color: var(--text); }
+
+  .info-text { font-size: 13px; color: var(--text2); margin-left: auto; }
+
+  /* ===== PHASE 2: TURNIER ===== */
+  .match-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .round-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold);
+    text-align: center;
+  }
+
+  .round-subtitle {
+    font-size: 14px;
+    color: var(--text2);
+    text-align: center;
+    margin-top: -12px;
+  }
+
+  /* Match bracket view */
+  .bracket {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  .bracket-match {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 200px;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .bracket-match.active { border-color: var(--gold); box-shadow: 0 0 20px rgba(241,196,15,0.15); }
+  .bracket-match.done { opacity: 0.6; }
+
+  .bracket-team {
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    transition: background 0.3s;
+  }
+
+  .bracket-team + .bracket-team { border-top: 1px solid var(--border); }
+  .bracket-team.winner { background: rgba(46,204,113,0.12); color: var(--green); font-weight: 700; }
+  .bracket-team.loser { background: rgba(231,76,60,0.08); color: var(--red); opacity: 0.6; }
+  .bracket-team .score { font-weight: 700; font-family: monospace; }
+
+  /* ===== FIELD (Duel Area) ===== */
+  .field {
+    width: 100%;
+    max-width: 700px;
+    aspect-ratio: 2/1;
+    background: var(--field);
+    border-radius: 14px;
+    border: 3px solid var(--field-line);
+    position: relative;
+    overflow: hidden;
+    margin: 0 auto;
+  }
+
+  .field-center-line {
+    position: absolute;
+    left: 50%; top: 0;
+    width: 2px; height: 100%;
+    background: var(--field-line);
+  }
+
+  .field-center-circle {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 80px; height: 80px;
+    border: 2px solid var(--field-line);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .field-text {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.7);
+    text-align: center;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .field-team-label {
+    position: absolute;
+    top: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    z-index: 5;
+  }
+
+  .field-team-label.left { left: 14px; }
+  .field-team-label.right { right: 14px; }
+
+  .field-score {
+    position: absolute;
+    bottom: 8px;
+    font-size: 28px;
+    font-weight: 700;
+    z-index: 5;
+  }
+
+  .field-score.left { left: 20px; color: var(--blue); }
+  .field-score.right { right: 20px; color: var(--red); }
+
+  /* Player figures on field */
+  .field-player {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 10;
+  }
+
+  .field-player .body {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    border: 2px solid rgba(255,255,255,0.3);
+    transition: all 0.5s;
+  }
+
+  .field-player .label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.8);
+    white-space: nowrap;
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+
+  .field-player .str-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.5);
+    color: var(--gold);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .field-player .str-badge.show { opacity: 1; }
+
+  .field-player.winner .body {
+    box-shadow: 0 0 15px rgba(46,204,113,0.6);
+    border-color: var(--green);
+  }
+
+  .field-player.loser .body {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  .field-player.entering-left { left: -50px !important; }
+  .field-player.entering-right { right: -50px !important; left: auto !important; }
+
+  /* Winner celebration */
+  .winner-banner {
+    text-align: center;
+    padding: 30px;
+    animation: cardIn 0.5s ease-out;
+  }
+
+  .winner-banner h2 {
+    font-size: 32px;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .trophy { font-size: 64px; margin-bottom: 16px; display: block; }
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .code-sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>OOP Fussball-Turnier</h1>
+  <div class="phase-indicator">
+    <div class="phase-dot" id="pd0">1</div>
+    <div class="phase-dot" id="pd1">2</div>
+    <div class="phase-dot" id="pd2">3</div>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="code-sidebar" id="codeSidebar"></div>
+  <div class="splitter" id="splitter"></div>
+  <div class="main">
+    <div class="content" id="content"></div>
+    <div class="bottom-bar" id="bottomBar"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// OOP MODEL (mirrors the Java classes)
+// ============================================================
+class Spieler {
+  constructor(name, staerke) {
+    this.name = name;
+    this.staerke = staerke;
+  }
+}
+
+class Mannschaft {
+  constructor(name) {
+    this.name = name;
+    this.spieler = []; // ArrayList<Spieler>
+    for (let i = 1; i <= 11; i++) {
+      const st = Math.floor(Math.random() * 41) + 60;
+      this.spieler.push(new Spieler("Spieler-" + i, st));
+    }
+  }
+  getStaerke() {
+    let sum = 0;
+    for (const s of this.spieler) sum += s.staerke;
+    return sum;
+  }
+}
+
+class Turnier {
+  constructor() {
+    this.mannschaften = []; // ArrayList<Mannschaft>
+  }
+  addMannschaft(m) {
+    this.mannschaften.push(m);
+  }
+}
+
+// ============================================================
+// APP STATE
+// ============================================================
+let turnier = new Turnier();
+let phase = 0; // 0=setup, 1=turnier, 2=done
+let rounds = [];       // [{matches: [{teamA, teamB, scoreA, scoreB, duels, done}]}]
+let currentRound = 0;
+let currentMatch = 0;
+let currentDuel = -1;
+let duelAnimating = false;
+let autoplayTimer = null;
+let autoplayOn = false;
+let sidebarWidth = 280;
+
+const TEAM_COLORS = [
+  '#3498db', '#e74c3c', '#2ecc71', '#e67e22',
+  '#9b59b6', '#1abc9c', '#f39c12', '#e84393',
+  '#00b894', '#6c5ce7', '#fd79a8', '#00cec9',
+  '#fdcb6e', '#636e72', '#d63031', '#0984e3'
+];
+
+const DEFAULT_NAMES = [
+  "FC Bayern", "Borussia Dortmund", "RB Leipzig", "Bayer Leverkusen",
+  "VfB Stuttgart", "Eintracht Frankfurt", "VfL Wolfsburg", "SC Freiburg",
+  "Union Berlin", "TSG Hoffenheim", "Werder Bremen", "FC Augsburg",
+  "1. FC Koeln", "Hertha BSC", "Mainz 05", "Gladbach"
+];
+
+// ============================================================
+// RENDERING
+// ============================================================
+function render() {
+  updatePhaseIndicator();
+  renderCode();
+  if (phase === 0) renderSetup();
+  else if (phase === 1) renderTurnier();
+  else renderDone();
+}
+
+function updatePhaseIndicator() {
+  for (let i = 0; i < 3; i++) {
+    const el = document.getElementById('pd' + i);
+    el.className = 'phase-dot' + (i === phase ? ' active' : (i < phase ? ' done' : ''));
+  }
+}
+
+// ===== CODE SIDEBAR =====
+function renderCode() {
+  const sb = document.getElementById('codeSidebar');
+  sb.innerHTML = `
+    <span class="class-label spieler-c">Spieler</span>
+    <div class="code-block"><span class="kw">class</span> <span class="tp">Spieler</span> {
+  <span class="kw">private</span> <span class="tp">String</span> name;
+  <span class="kw">private</span> <span class="tp">int</span> staerke;
+
+  <span class="tp">Spieler</span>(<span class="tp">String</span> name, <span class="tp">int</span> st){
+    <span class="kw">this</span>.name = name;
+    <span class="kw">this</span>.staerke = st;
+  }
+}</div>
+
+    <span class="class-label team-c">Mannschaft</span>
+    <div class="code-block"><span class="kw">class</span> <span class="tp">Mannschaft</span> {
+  <span class="kw">private</span> <span class="tp">String</span> name;
+  <span class="kw">private</span> <span class="tp">ArrayList</span><<span class="tp">Spieler</span>> spieler;
+
+  <span class="tp">Mannschaft</span>(<span class="tp">String</span> name){
+    <span class="kw">this</span>.name = name;
+    <span class="kw">this</span>.spieler = <span class="kw">new</span> <span class="tp">ArrayList</span>();
+    <span class="kw">for</span>(<span class="tp">int</span> i=<span class="nr">1</span>; i<=<span class="nr">11</span>; i++){
+      <span class="tp">int</span> st = random(<span class="nr">60</span>,<span class="nr">100</span>);
+      spieler.add(
+        <span class="kw">new</span> <span class="tp">Spieler</span>(<span class="st">"Spieler-"</span>+i, st)
+      );
+    }
+  }
+
+  <span class="tp">int</span> getStaerke(){
+    <span class="tp">int</span> sum = <span class="nr">0</span>;
+    <span class="kw">for</span>(<span class="tp">Spieler</span> s : spieler){
+      sum += s.staerke;
+    }
+    <span class="kw">return</span> sum;
+  }
+}</div>
+
+    <span class="class-label turnier-c">Turnier</span>
+    <div class="code-block"><span class="kw">class</span> <span class="tp">Turnier</span> {
+  <span class="kw">private</span> <span class="tp">ArrayList</span><<span class="tp">Mannschaft</span>>
+    mannschaften;
+
+  <span class="tp">Turnier</span>(){
+    mannschaften =
+      <span class="kw">new</span> <span class="tp">ArrayList</span>();
+  }
+
+  <span class="kw">void</span> create(<span class="tp">String</span> name){
+    <span class="tp">Mannschaft</span> m =
+      <span class="kw">new</span> <span class="tp">Mannschaft</span>(name);
+    <span class="cm">// Konstruktor erzeugt</span>
+    <span class="cm">// automatisch 11 Spieler</span>
+    <span class="cm">// mit random Staerke!</span>
+    mannschaften.add(m);
+  }
+
+  <span class="cm">// Benutzung:</span>
+  <span class="cm">// t = new Turnier();</span>
+  <span class="cm">// t.create("FC Bayern");</span>
+  <span class="cm">// t.create("Dortmund");</span>
+  <span class="cm">// t.start();</span>
+
+  <span class="kw">void</span> start(){
+    <span class="tp">ArrayList</span><<span class="tp">Mannschaft</span>> runde
+      = mannschaften;
+
+    <span class="kw">while</span>(runde.size() > <span class="nr">1</span>){
+      <span class="tp">ArrayList</span><<span class="tp">Mannschaft</span>> gewinner
+        = <span class="kw">new</span> <span class="tp">ArrayList</span>();
+
+      <span class="kw">for</span>(<span class="tp">int</span> i=<span class="nr">0</span>; i < runde.size(); i+=<span class="nr">2</span>){
+        <span class="tp">Mannschaft</span> a = runde.get(i);
+        <span class="tp">Mannschaft</span> b = runde.get(i+<span class="nr">1</span>);
+        <span class="tp">int</span> siege = <span class="nr">0</span>;
+
+        <span class="kw">for</span>(<span class="tp">int</span> d=<span class="nr">0</span>; d<<span class="nr">11</span>; d++){
+          <span class="tp">Spieler</span> sA = a.spieler.get(d);
+          <span class="tp">Spieler</span> sB = b.spieler.get(d);
+          <span class="kw">if</span>(sA.staerke > sB.staerke)
+            siege++;
+        }
+
+        <span class="kw">if</span>(siege > <span class="nr">5</span>)
+          gewinner.add(a);
+        <span class="kw">else</span>
+          gewinner.add(b);
+      }
+      runde = gewinner;
+    }
+    <span class="cm">// runde.get(0) = Sieger!</span>
+  }
+}</div>
+  `;
+}
+
+// ===== PHASE 0: SETUP =====
+function renderSetup() {
+  const c = document.getElementById('content');
+  let html = '<div class="setup-grid">';
+
+  turnier.mannschaften.forEach((m, mi) => {
+    const color = TEAM_COLORS[mi % TEAM_COLORS.length];
+    html += `<div class="team-card" style="border-top: 3px solid ${color}">
+      <div class="team-card-header">
+        <input class="team-name" value="${esc(m.name)}" onchange="renameTeam(${mi}, this.value)" />
+        <span class="team-strength">${m.getStaerke()}</span>
+      </div>
+      <div class="player-list">`;
+
+    m.spieler.forEach((s, si) => {
+      const pct = ((s.staerke - 60) / 40) * 100;
+      const barColor = s.staerke >= 85 ? 'var(--green)' : s.staerke >= 72 ? 'var(--gold)' : 'var(--red)';
+      html += `<div class="player-row">
+        <span class="idx">${si + 1}</span>
+        <input class="pname" value="${esc(s.name)}" onchange="renamePlayer(${mi},${si},this.value)" />
+        <div class="str-bar-bg"><div class="str-bar" style="width:${pct}%;background:${barColor}"></div></div>
+        <input class="str-input" type="number" value="${s.staerke}" min="60" max="100"
+               onchange="setPlayerStr(${mi},${si},this.value)" />
+      </div>`;
+    });
+
+    html += `</div>
+      <div style="padding:6px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="removeTeam(${mi})">Entfernen</button>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="add-team-card" onclick="addTeam()">
+    <div class="plus">+</div>
+    <span>new Mannschaft()</span>
+  </div>`;
+  html += '</div>';
+  c.innerHTML = html;
+
+  // Bottom bar
+  const n = turnier.mannschaften.length;
+  const valid = n >= 2 && (n & (n - 1)) === 0; // power of 2
+  const hint = n < 2 ? "Mindestens 2 Mannschaften" :
+               !valid ? `${n} Teams - brauche 2, 4, 8 oder 16` : `${n} Mannschaften bereit!`;
+
+  document.getElementById('bottomBar').innerHTML = `
+    <button class="btn btn-green" onclick="addTeam()">+ Mannschaft</button>
+    <span class="info-text">${hint}</span>
+    <button class="btn btn-gold" ${valid ? '' : 'disabled'} onclick="startTurnier()" style="margin-left:auto">
+      Turnier starten!
+    </button>
+  `;
+}
+
+function addTeam() {
+  const idx = turnier.mannschaften.length;
+  const name = DEFAULT_NAMES[idx] || ("Team " + (idx + 1));
+  turnier.addMannschaft(new Mannschaft(name));
+  render();
+}
+
+function removeTeam(i) {
+  turnier.mannschaften.splice(i, 1);
+  render();
+}
+
+function renameTeam(i, val) {
+  turnier.mannschaften[i].name = val;
+  render();
+}
+
+function renamePlayer(ti, pi, val) {
+  turnier.mannschaften[ti].spieler[pi].name = val;
+}
+
+function setPlayerStr(ti, pi, val) {
+  let v = parseInt(val);
+  if (isNaN(v)) v = 60;
+  v = Math.max(60, Math.min(100, v));
+  turnier.mannschaften[ti].spieler[pi].staerke = v;
+  render();
+}
+
+// ===== START TURNIER =====
+function startTurnier() {
+  phase = 1;
+  rounds = [];
+  currentRound = 0;
+  currentMatch = 0;
+  currentDuel = -1;
+  buildRound(turnier.mannschaften.slice());
+  render();
+}
+
+function buildRound(teams) {
+  const matches = [];
+  for (let i = 0; i < teams.length; i += 2) {
+    // Shuffle player order for each team
+    const duels = [];
+    const aPlayers = shuffle(teams[i].spieler.slice());
+    const bPlayers = shuffle(teams[i + 1].spieler.slice());
+    for (let d = 0; d < 11; d++) {
+      duels.push({ a: aPlayers[d], b: bPlayers[d], result: null });
+    }
+    matches.push({
+      teamA: teams[i],
+      teamB: teams[i + 1],
+      scoreA: 0, scoreB: 0,
+      duels,
+      done: false
+    });
+  }
+  rounds.push({ matches });
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ===== PHASE 1: TURNIER RENDERING =====
+function renderTurnier() {
+  const c = document.getElementById('content');
+  const round = rounds[currentRound];
+  const match = round.matches[currentMatch];
+
+  const roundNames = getRoundNames();
+  const roundName = roundNames[currentRound] || `Runde ${currentRound + 1}`;
+
+  let html = `<div class="match-container">`;
+  html += `<div class="round-title">${roundName}</div>`;
+  html += `<div class="round-subtitle">Spiel ${currentMatch + 1} von ${round.matches.length}</div>`;
+
+  // Bracket
+  html += `<div class="bracket">`;
+  round.matches.forEach((m, mi) => {
+    const isActive = mi === currentMatch && !m.done;
+    const cls = m.done ? 'done' : (isActive ? 'active' : '');
+    const wA = m.done && m.scoreA > m.scoreB;
+    const wB = m.done && m.scoreB > m.scoreA;
+    html += `<div class="bracket-match ${cls}">
+      <div class="bracket-team ${wA ? 'winner' : (m.done ? 'loser' : '')}">
+        <span>${esc(m.teamA.name)}</span>
+        <span class="score">${m.done ? m.scoreA : '-'}</span>
+      </div>
+      <div class="bracket-team ${wB ? 'winner' : (m.done ? 'loser' : '')}">
+        <span>${esc(m.teamB.name)}</span>
+        <span class="score">${m.done ? m.scoreB : '-'}</span>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Field
+  const colA = TEAM_COLORS[turnier.mannschaften.indexOf(match.teamA) % TEAM_COLORS.length];
+  const colB = TEAM_COLORS[turnier.mannschaften.indexOf(match.teamB) % TEAM_COLORS.length];
+
+  html += `<div class="field" id="field">
+    <div class="field-center-line"></div>
+    <div class="field-center-circle"></div>
+    <div class="field-team-label left" style="color:${colA}">${esc(match.teamA.name)}</div>
+    <div class="field-team-label right" style="color:${colB}">${esc(match.teamB.name)}</div>
+    <div class="field-score left" id="scoreA">${match.scoreA}</div>
+    <div class="field-score right" id="scoreB">${match.scoreB}</div>
+    <div class="field-text" id="fieldText"></div>
+  </div>`;
+
+  // Duel log
+  html += `<div style="width:100%;max-width:700px">`;
+  match.duels.forEach((d, di) => {
+    if (d.result === null) return;
+    const wA = d.result === 'a';
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border);animation:cardIn 0.3s">
+      <span style="color:var(--text2);width:24px;text-align:right">${di + 1}.</span>
+      <span style="flex:1;text-align:right;color:${wA ? 'var(--green)' : 'var(--red)'};font-weight:${wA ? '700' : '400'}">${esc(d.a.name)} (${d.a.staerke})</span>
+      <span style="color:var(--text2)">vs</span>
+      <span style="flex:1;color:${!wA ? 'var(--green)' : 'var(--red)'};font-weight:${!wA ? '700' : '400'}">${esc(d.b.name)} (${d.b.staerke}) </span>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `</div>`;
+  c.innerHTML = html;
+
+  // Bottom bar
+  const allMatchesDone = round.matches.every(m => m.done);
+  document.getElementById('bottomBar').innerHTML = `
+    <button class="btn btn-outline" onclick="backToSetup()">Abbrechen</button>
+    <span class="info-text" id="matchStatus">${getMatchStatus(match)}</span>
+    <button class="btn btn-autoplay ${autoplayOn ? 'active' : 'btn-outline'}" onclick="toggleAutoplay()">
+      ${autoplayOn ? 'Auto: AN' : 'Auto: AUS'}
+    </button>
+    <button class="btn btn-gold" id="playBtn" style="margin-left:auto"
+            onclick="playNext()" ${duelAnimating ? 'disabled' : ''}>
+      ${currentDuel < 0 ? 'Jetzt spielen!' : (match.done ? (allMatchesDone ? 'Naechste Runde' : 'Naechstes Spiel') : 'Naechstes Duell')}
+    </button>
+  `;
+}
+
+function getMatchStatus(match) {
+  if (match.done) {
+    const w = match.scoreA > match.scoreB ? match.teamA.name : match.teamB.name;
+    return `${w} gewinnt ${Math.max(match.scoreA, match.scoreB)}-${Math.min(match.scoreA, match.scoreB)}!`;
+  }
+  if (currentDuel < 0) return `${match.teamA.name} vs ${match.teamB.name} - Bereit!`;
+  return `Duell ${currentDuel + 1}/11 - Stand: ${match.scoreA}-${match.scoreB}`;
+}
+
+function getRoundNames() {
+  const total = rounds.length + Math.ceil(Math.log2(rounds[0]?.matches.length || 1));
+  // Calculate from total teams
+  const n = turnier.mannschaften.length;
+  const names = [];
+  let r = n;
+  while (r >= 2) {
+    if (r === 2) names.push("Finale");
+    else if (r === 4) names.push("Halbfinale");
+    else if (r === 8) names.push("Viertelfinale");
+    else if (r === 16) names.push("Achtelfinale");
+    else names.push(`Runde (${r} Teams)`);
+    r = r / 2;
+  }
+  return names;
+}
+
+// ===== DUEL ANIMATION =====
+function playNext() {
+  if (duelAnimating) return;
+
+  const round = rounds[currentRound];
+  const match = round.matches[currentMatch];
+
+  // Match done -> next match or round
+  if (match.done) {
+    const allDone = round.matches.every(m => m.done);
+    if (allDone) {
+      // Build next round
+      const winners = round.matches.map(m => m.scoreA > m.scoreB ? m.teamA : m.teamB);
+      if (winners.length === 1) {
+        // Tournament over!
+        phase = 2;
+        render();
+        return;
+      }
+      currentRound++;
+      currentMatch = 0;
+      currentDuel = -1;
+      buildRound(winners);
+      render();
+      return;
+    }
+    // Next match in round
+    currentMatch++;
+    currentDuel = -1;
+    render();
+    return;
+  }
+
+  // Start new duel
+  currentDuel++;
+  if (currentDuel >= 11) {
+    match.done = true;
+    render();
+    return;
+  }
+
+  animateDuel(match, currentDuel);
+}
+
+async function animateDuel(match, duelIdx) {
+  duelAnimating = true;
+  document.getElementById('playBtn').disabled = true;
+
+  const field = document.getElementById('field');
+  const duel = match.duels[duelIdx];
+  const colA = TEAM_COLORS[turnier.mannschaften.indexOf(match.teamA) % TEAM_COLORS.length];
+  const colB = TEAM_COLORS[turnier.mannschaften.indexOf(match.teamB) % TEAM_COLORS.length];
+
+  // Clear previous players from field
+  field.querySelectorAll('.field-player').forEach(el => el.remove());
+  document.getElementById('fieldText').textContent = '';
+
+  // Create player elements off-screen
+  const pA = document.createElement('div');
+  pA.className = 'field-player';
+  pA.id = 'playerA';
+  pA.innerHTML = `<div class="body" style="background:${colA}">${duelIdx + 1}</div>
+    <div class="label">${esc(duel.a.name)}</div>
+    <div class="str-badge" id="strA">${duel.a.staerke}</div>`;
+  pA.style.left = '-60px';
+  pA.style.top = 'calc(50% - 30px)';
+
+  const pB = document.createElement('div');
+  pB.className = 'field-player';
+  pB.id = 'playerB';
+  pB.innerHTML = `<div class="body" style="background:${colB}">${duelIdx + 1}</div>
+    <div class="label">${esc(duel.b.name)}</div>
+    <div class="str-badge" id="strB">${duel.b.staerke}</div>`;
+  pB.style.right = '-60px';
+  pB.style.left = 'auto';
+  pB.style.top = 'calc(50% - 30px)';
+
+  field.appendChild(pA);
+  field.appendChild(pB);
+
+  await sleep(50);
+
+  // Step 1: Enter field
+  pA.style.left = '25%';
+  pB.style.right = '25%';
+  pB.style.left = 'auto';
+
+  await sleep(800);
+
+  // Step 2: Show strength
+  document.getElementById('strA').classList.add('show');
+  document.getElementById('strB').classList.add('show');
+  document.getElementById('fieldText').textContent = `${duel.a.staerke} vs ${duel.b.staerke}`;
+
+  await sleep(1000);
+
+  // Step 3: Determine winner
+  let winner;
+  if (duel.a.staerke !== duel.b.staerke) {
+    winner = duel.a.staerke > duel.b.staerke ? 'a' : 'b';
+  } else {
+    winner = Math.random() < 0.5 ? 'a' : 'b';
+  }
+  duel.result = winner;
+
+  if (winner === 'a') {
+    match.scoreA++;
+    pA.classList.add('winner');
+    pB.classList.add('loser');
+  } else {
+    match.scoreB++;
+    pB.classList.add('winner');
+    pA.classList.add('loser');
+  }
+
+  document.getElementById('scoreA').textContent = match.scoreA;
+  document.getElementById('scoreB').textContent = match.scoreB;
+  document.getElementById('fieldText').innerHTML = `<span style="color:var(--green)">${winner === 'a' ? esc(duel.a.name) : esc(duel.b.name)} gewinnt!</span>`;
+
+  await sleep(800);
+
+  // Step 4: Loser walks off
+  if (winner === 'a') {
+    pB.style.right = '-60px';
+  } else {
+    pA.style.left = '-60px';
+  }
+
+  await sleep(600);
+
+  // Winner walks off too
+  if (winner === 'a') {
+    pA.style.left = '-60px';
+  } else {
+    pB.style.right = '-60px';
+    pB.style.left = 'auto';
+  }
+
+  await sleep(400);
+
+  // Check if match is decided early
+  const remaining = 11 - (duelIdx + 1);
+  if (match.scoreA > 5 || match.scoreB > 5 ||
+      (match.scoreA + remaining < match.scoreB) ||
+      (match.scoreB + remaining < match.scoreA)) {
+    // Auto-resolve remaining
+    for (let d = duelIdx + 1; d < 11; d++) {
+      const dd = match.duels[d];
+      if (dd.a.staerke !== dd.b.staerke) {
+        dd.result = dd.a.staerke > dd.b.staerke ? 'a' : 'b';
+      } else {
+        dd.result = Math.random() < 0.5 ? 'a' : 'b';
+      }
+      if (dd.result === 'a') match.scoreA++;
+      else match.scoreB++;
+    }
+    currentDuel = 10;
+    match.done = true;
+  }
+
+  duelAnimating = false;
+  render();
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ===== PHASE 2: WINNER =====
+function renderDone() {
+  const lastRound = rounds[rounds.length - 1];
+  const finalMatch = lastRound.matches[0];
+  const winner = finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamA : finalMatch.teamB;
+  const ci = turnier.mannschaften.indexOf(winner);
+  const color = TEAM_COLORS[ci % TEAM_COLORS.length];
+
+  document.getElementById('content').innerHTML = `
+    <div class="winner-banner">
+      <span class="trophy">&#9917;</span>
+      <h2 style="color:${color}">${esc(winner.name)}</h2>
+      <p style="font-size:18px;color:var(--text2);margin-bottom:20px">gewinnt das Turnier!</p>
+      <p style="color:var(--gold);font-size:16px">Mannschaftsstaerke: ${winner.getStaerke()}</p>
+      <div style="margin-top:24px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        ${winner.spieler.map(s => `<div style="background:var(--surface2);border:1px solid ${color};border-radius:8px;padding:6px 12px;font-size:13px">
+          ${esc(s.name)} <span style="color:var(--gold);font-weight:700">${s.staerke}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div style="margin-top:24px">
+      <h3 style="color:var(--text2);text-align:center;margin-bottom:16px">Turnier-Verlauf</h3>
+      ${rounds.map((r, ri) => {
+        const rn = getRoundNames()[ri] || `Runde ${ri+1}`;
+        return `<div style="margin-bottom:16px">
+          <div style="color:var(--gold);font-weight:700;margin-bottom:8px;text-align:center">${rn}</div>
+          <div class="bracket">${r.matches.map(m => {
+            const wA = m.scoreA > m.scoreB;
+            return `<div class="bracket-match">
+              <div class="bracket-team ${wA ? 'winner' : 'loser'}">${esc(m.teamA.name)}<span class="score">${m.scoreA}</span></div>
+              <div class="bracket-team ${!wA ? 'winner' : 'loser'}">${esc(m.teamB.name)}<span class="score">${m.scoreB}</span></div>
+            </div>`;
+          }).join('')}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  document.getElementById('bottomBar').innerHTML = `
+    <button class="btn btn-gold" onclick="resetAll()">Neues Turnier</button>
+  `;
+}
+
+function backToSetup() {
+  autoplayOn = false; clearTimeout(autoplayTimer);
+  phase = 0;
+  rounds = [];
+  currentRound = 0;
+  render();
+}
+
+function resetAll() {
+  autoplayOn = false; clearTimeout(autoplayTimer);
+  turnier = new Turnier();
+  phase = 0;
+  rounds = [];
+  render();
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===== AUTOPLAY =====
+function toggleAutoplay() {
+  autoplayOn = !autoplayOn;
+  if (autoplayOn) {
+    scheduleAutoplay();
+  } else {
+    clearTimeout(autoplayTimer);
+    autoplayTimer = null;
+  }
+  render();
+}
+
+function scheduleAutoplay() {
+  clearTimeout(autoplayTimer);
+  if (!autoplayOn || phase !== 1) return;
+  autoplayTimer = setTimeout(() => {
+    if (!autoplayOn || phase !== 1) return;
+    if (!duelAnimating) {
+      playNext();
+    }
+    scheduleAutoplay();
+  }, 2000);
+}
+
+// Hook into render to keep autoplay going
+const _origRender = render;
+render = function() {
+  _origRender();
+  if (autoplayOn && phase === 1) scheduleAutoplay();
+  if (phase !== 1) { autoplayOn = false; clearTimeout(autoplayTimer); }
+};
+
+// ===== RESIZABLE SPLITTER =====
+(function() {
+  const splitter = document.getElementById('splitter');
+  const layout = document.querySelector('.layout');
+  const sidebar = document.getElementById('codeSidebar');
+  let dragging = false;
+
+  splitter.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    splitter.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    let w = e.clientX;
+    if (w < 120) w = 120;
+    if (w > 600) w = 600;
+    sidebarWidth = w;
+    layout.style.gridTemplateColumns = w + 'px 6px 1fr';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+// ===== INIT =====
+// Start with 4 teams
+addTeam(); addTeam(); addTeam(); addTeam();
+render();
+</script>
+</body>
+</html>

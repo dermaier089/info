@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bälle-Fänger – OOP interaktiv</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1923;
+    color: #e0e8f0;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  .layout {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* === SPIELFELD === */
+  .spiel-bereich {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .spiel-header {
+    padding: 12px 20px;
+    background: #162230;
+    border-bottom: 1px solid #2a3a4a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .spiel-header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #7eb8e0;
+  }
+
+  .btn {
+    padding: 6px 16px;
+    border: 1px solid #3a5a7a;
+    background: #1e3248;
+    color: #a0c4e0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #2a4a68; border-color: #5a8ab0; }
+  .btn.aktiv { background: #1a5a2a; border-color: #3a8a4a; color: #80e090; }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .overlay-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 20, 30, 0.85);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #6a9ac0;
+    border: 1px solid #2a4a6a;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  /* === SIDEBAR === */
+  .sidebar {
+    width: 380px;
+    min-width: 380px;
+    background: #131f2b;
+    border-left: 1px solid #2a3a4a;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid #2a3a4a;
+  }
+
+  .sidebar-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #5a7a9a;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .sidebar-tab:hover { color: #8ab0d0; }
+  .sidebar-tab.aktiv { color: #7eb8e0; border-bottom-color: #4a90c0; }
+
+  .sidebar-content {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.aktiv { display: block; }
+
+  /* Objekt-Karten */
+  .objekt-karte {
+    background: #1a2a38;
+    border: 1px solid #2a4050;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .objekt-karte.highlight {
+    border-color: #f0a030;
+    box-shadow: 0 0 12px rgba(240, 160, 48, 0.2);
+  }
+  .objekt-karte.gefangen {
+    opacity: 0.4;
+    border-color: #3a3a3a;
+  }
+
+  .objekt-header {
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .objekt-header .typ { color: #5a8ab0; font-weight: 400; font-size: 12px; }
+
+  .objekt-body {
+    padding: 6px 12px 10px;
+  }
+
+  .attr-zeile {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 12.5px;
+    font-family: 'Consolas', 'Fira Code', monospace;
+  }
+  .attr-name { color: #7a9ab8; }
+  .attr-wert { color: #e0d080; font-weight: 500; }
+  .attr-wert.string { color: #80c090; }
+  .attr-wert.referenz { color: #c090e0; }
+
+  .farb-punkt {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  /* Klassendiagramm */
+  .klassen-box {
+    background: #1a2a38;
+    border: 2px solid #3a6090;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12px;
+  }
+  .klassen-name {
+    background: #2a4a68;
+    padding: 6px 10px;
+    font-weight: 700;
+    text-align: center;
+    color: #a0d0f0;
+    font-size: 13px;
+  }
+  .klassen-section {
+    padding: 6px 10px;
+    border-top: 1px solid #2a4060;
+  }
+  .klassen-section div {
+    padding: 2px 0;
+    color: #90b0c8;
+  }
+  .klassen-section .keyword { color: #c080d0; }
+  .klassen-section .type { color: #60a0d0; }
+
+  .beziehung-label {
+    text-align: center;
+    padding: 6px;
+    color: #6a8aa0;
+    font-size: 12px;
+  }
+  .beziehung-label .pfeil { font-size: 16px; color: #4a7a9a; }
+
+  /* Score */
+  .score-box {
+    background: #1a2a38;
+    border: 1px solid #2a4050;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .score-zahl {
+    font-size: 36px;
+    font-weight: 700;
+    color: #f0c040;
+  }
+  .score-label {
+    font-size: 12px;
+    color: #6a8aa0;
+    margin-top: 2px;
+  }
+
+  .feld-info {
+    background: #162030;
+    border: 1px solid #2a3a4a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: #7a9ab8;
+  }
+  .feld-info .index { color: #5a7a90; }
+  .feld-info .wert { color: #e0d080; }
+  .feld-info .null-wert { color: #6a4a4a; }
+
+  /* Legende */
+  .legende {
+    background: #162030;
+    border: 1px solid #2a3a4a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #6a8aa0;
+    line-height: 1.6;
+  }
+  .legende strong { color: #a0c0d8; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="spiel-bereich">
+    <div class="spiel-header">
+      <h1>🎮 Bälle-Fänger Spiel</h1>
+      <div class="controls">
+        <button class="btn" id="btnReset" onclick="spielReset()">Neu starten</button>
+        <button class="btn" id="btnPause" onclick="spielPause()">Pause</button>
+        <button class="btn" id="btnSpeed" onclick="toggleSpeed()">Langsam</button>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="spielfeld"></canvas>
+      <div class="overlay-hint" id="hint">← → Pfeiltasten zum Steuern</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab aktiv" onclick="zeigeTab('objekte')">Objekte</div>
+      <div class="sidebar-tab" onclick="zeigeTab('klassen')">Klassendiagramm</div>
+      <div class="sidebar-tab" onclick="zeigeTab('feld')">Feld-Ansicht</div>
+    </div>
+    <div class="sidebar-content">
+
+      <!-- TAB: Objekte -->
+      <div class="tab-panel aktiv" id="tab-objekte">
+        <div class="score-box">
+          <div class="score-zahl" id="scoreZahl">0</div>
+          <div class="score-label">Gefangene Bälle</div>
+        </div>
+        <div id="faengerKarte"></div>
+        <div id="ballKarten"></div>
+      </div>
+
+      <!-- TAB: Klassendiagramm -->
+      <div class="tab-panel" id="tab-klassen">
+        <div class="klassen-box">
+          <div class="klassen-name">SPIEL</div>
+          <div class="klassen-section">
+            <div><span class="keyword">private</span> <span class="type">Faenger</span> faenger</div>
+            <div><span class="keyword">private</span> <span class="type">Ball[]</span> baelle</div>
+          </div>
+          <div class="klassen-section">
+            <div>Konstruktor()</div>
+            <div>foo()</div>
+            <div>BaelleFaerben(<span class="type">String</span> farbe)</div>
+            <div>zufall(<span class="type">int</span> max): <span class="type">int</span></div>
+          </div>
+        </div>
+
+        <div class="beziehung-label">
+          <span class="pfeil">▼</span> enthält 1 &nbsp;&nbsp;&nbsp; <span class="pfeil">▼</span> enthält n
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div class="klassen-box" style="flex:1;">
+            <div class="klassen-name">FAENGER</div>
+            <div class="klassen-section">
+              <div><span class="type">int</span> x</div>
+              <div><span class="type">int</span> y</div>
+              <div><span class="type">int</span> breite</div>
+            </div>
+            <div class="klassen-section">
+              <div>nachLinks()</div>
+              <div>nachRechts()</div>
+              <div>beruehrt(<span class="type">Ball</span> b): <span class="type">boolean</span></div>
+            </div>
+          </div>
+
+          <div class="klassen-box" style="flex:1;">
+            <div class="klassen-name">BALL</div>
+            <div class="klassen-section">
+              <div><span class="type">String</span> farbe</div>
+              <div><span class="type">int</span> punkte</div>
+              <div><span class="type">int</span> radius</div>
+              <div><span class="type">int</span> x, y</div>
+            </div>
+            <div class="klassen-section">
+              <div>Konstruktor(<span class="type">String</span> f, <span class="type">int</span> p)</div>
+              <div>RadiusSetzen(<span class="type">int</span> r)</div>
+              <div>PositionSetzen(<span class="type">int</span> x, <span class="type">int</span> y)</div>
+              <div>FarbeSetzen(<span class="type">String</span> f)</div>
+              <div>punkteGeben(): <span class="type">int</span></div>
+              <div>Entfernen()</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="legende" style="margin-top: 16px;">
+          <strong>Beziehungen:</strong><br>
+          SPIEL <strong>enthält 1</strong> FAENGER (Referenzattribut)<br>
+          SPIEL <strong>enthält n</strong> BALL (Feld/Array)<br><br>
+          <strong>Kapselung:</strong> Attribute sind <code>private</code> — Zugriff nur über Methoden (Getter/Setter).
+        </div>
+      </div>
+
+      <!-- TAB: Feld-Ansicht -->
+      <div class="tab-panel" id="tab-feld">
+        <div style="margin-bottom:12px; color:#7a9ab8; font-size:13px;">
+          <strong>baelle: Ball[]</strong> — Das Feld im Überblick
+        </div>
+        <div class="feld-info" id="feldAnsicht"></div>
+        <div class="legende">
+          <strong>So funktioniert das Feld:</strong><br>
+          • <code>baelle = new Ball[5]</code> erzeugt 5 Plätze<br>
+          • Jeder Platz speichert eine <strong>Referenz</strong> auf ein Ball-Objekt<br>
+          • <code>baelle[i] = null</code> → Platz ist leer (Ball gefangen)<br>
+          • <code>baelle.length</code> = 5 (Größe des Feldes)<br><br>
+          <strong>foo() prüft für jeden Platz:</strong><br>
+          1. Ist der Platz nicht null?<br>
+          2. Berührt der Ball den Fänger?<br>
+          3. Wenn ja → Ball entfernen, Platz auf null setzen
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================
+// KLASSEN (wie in der Aufgabe)
+// =============================================
+
+class Ball {
+  constructor(farbe, punkte) {
+    this.farbe = farbe;
+    this.punkte = punkte;
+    this.radius = 20;
+    this.x = 0;
+    this.y = 0;
+    this.speed = 1 + Math.random() * 1.5;
+    this.entfernt = false;
+    this.gefangen = false;
+    this.blinkTimer = 0;
+  }
+
+  RadiusSetzen(r) { this.radius = r; }
+  PositionSetzen(x, y) { this.x = x; this.y = y; }
+  FarbeSetzen(f) { this.farbe = f; }
+  punkteGeben() { return this.punkte; }
+  farbeGeben() { return this.farbe; }
+
+  Entfernen() {
+    this.entfernt = true;
+    this.gefangen = true;
+    this.blinkTimer = 30;
+  }
+}
+
+class Faenger {
+  constructor(canvasW, canvasH) {
+    this.breite = 100;
+    this.hoehe = 16;
+    this.x = canvasW / 2 - this.breite / 2;
+    this.y = canvasH - 40;
+    this.speed = 7;
+  }
+
+  nachLinks() { this.x = Math.max(0, this.x - this.speed); }
+  nachRechts(maxX) { this.x = Math.min(maxX - this.breite, this.x + this.speed); }
+
+  beruehrt(ball) {
+    if (!ball || ball.entfernt) return false;
+    const bx = ball.x, by = ball.y, br = ball.radius;
+    return (
+      by + br >= this.y &&
+      by - br <= this.y + this.hoehe &&
+      bx + br >= this.x &&
+      bx - br <= this.x + this.breite
+    );
+  }
+}
+
+// =============================================
+// SPIEL
+// =============================================
+
+const canvas = document.getElementById('spielfeld');
+const ctx = canvas.getContext('2d');
+
+let faenger, baelle, score, paused, slowMode, hintVisible;
+let keys = {};
+let highlightBall = -1;
+
+function zufall(max) {
+  return Math.floor(Math.random() * (max + 1));
+}
+
+function spielInit() {
+  resizeCanvas();
+  faenger = new Faenger(canvas.width, canvas.height);
+  baelle = new Array(5);
+
+  // Aufgabe d) + e): Feld füllen
+  for (let i = 0; i < baelle.length; i++) {
+    baelle[i] = new Ball("rot", zufall(100));
+    baelle[i].RadiusSetzen(20);
+    baelle[i].PositionSetzen(zufall(canvas.width - 40) + 20, -(zufall(100)));
+  }
+
+  // Aufgabe g): Bälle mit > 50 Punkten orange färben
+  BaelleFaerben("orange");
+
+  score = 0;
+  paused = false;
+  slowMode = false;
+  hintVisible = true;
+  updateUI();
+}
+
+// Aufgabe g)
+function BaelleFaerben(farbe) {
+  for (let i = 0; i < baelle.length; i++) {
+    if (baelle[i] !== null && baelle[i].punkteGeben() > 50) {
+      baelle[i].FarbeSetzen(farbe);
+    }
+  }
+}
+
+// Aufgabe f): foo() — prüft Kollision und entfernt gefangene Bälle
+function foo() {
+  for (let i = 0; i < baelle.length; i++) {
+    if (baelle[i] !== null && !baelle[i].entfernt) {
+      if (faenger.beruehrt(baelle[i])) {
+        baelle[i].Entfernen();
+        score++;
+      }
+    }
+  }
+}
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+}
+
+// =============================================
+// GAME LOOP
+// =============================================
+
+function update() {
+  if (paused) return;
+
+  const speedFactor = slowMode ? 0.35 : 1;
+
+  // Steuerung
+  if (keys['ArrowLeft'] || keys['a']) faenger.nachLinks();
+  if (keys['ArrowRight'] || keys['d']) faenger.nachRechts(canvas.width);
+
+  // Bälle bewegen
+  for (let i = 0; i < baelle.length; i++) {
+    if (baelle[i] !== null && !baelle[i].entfernt) {
+      baelle[i].y += baelle[i].speed * 2 * speedFactor;
+
+      // Unten angekommen → wieder oben starten
+      if (baelle[i].y - baelle[i].radius > canvas.height) {
+        baelle[i].y = -(zufall(80));
+        baelle[i].x = zufall(canvas.width - 60) + 30;
+      }
+    }
+
+    // Blink-Animation bei Fang
+    if (baelle[i] !== null && baelle[i].blinkTimer > 0) {
+      baelle[i].blinkTimer--;
+      if (baelle[i].blinkTimer <= 0) {
+        baelle[i] = null; // Aus dem Feld entfernen
+      }
+    }
+  }
+
+  // foo() — Kollisionsprüfung
+  foo();
+
+  // Hint ausblenden
+  if (hintVisible && (keys['ArrowLeft'] || keys['ArrowRight'])) {
+    hintVisible = false;
+    document.getElementById('hint').style.opacity = '0';
+  }
+}
+
+function draw() {
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Hintergrund-Gitter
+  ctx.strokeStyle = 'rgba(40, 60, 80, 0.3)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 50) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let y = 0; y < h; y += 50) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // Bälle zeichnen
+  const farbMap = {
+    'rot': '#e04040', 'orange': '#e8a030', 'blau': '#4080e0',
+    'gruen': '#40b060', 'gelb': '#e0d040'
+  };
+
+  for (let i = 0; i < baelle.length; i++) {
+    const b = baelle[i];
+    if (!b) continue;
+
+    const color = farbMap[b.farbe] || b.farbe;
+
+    // Blink bei Fang
+    if (b.blinkTimer > 0 && b.blinkTimer % 6 < 3) continue;
+
+    // Schatten
+    ctx.beginPath();
+    ctx.arc(b.x + 2, b.y + 2, b.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fill();
+
+    // Ball
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(b.x - 5, b.y - 5, 2, b.x, b.y, b.radius);
+    grad.addColorStop(0, '#ffffff40');
+    grad.addColorStop(0.3, color);
+    grad.addColorStop(1, color + '90');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Highlight-Ring
+    if (i === highlightBall) {
+      ctx.strokeStyle = '#f0c040';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Punkte-Zahl auf dem Ball
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.punkte, b.x, b.y);
+
+    // Index-Label
+    ctx.fillStyle = 'rgba(200,220,240,0.6)';
+    ctx.font = '10px Consolas, monospace';
+    ctx.fillText('[' + i + ']', b.x, b.y - b.radius - 8);
+  }
+
+  // Fänger zeichnen
+  const fx = faenger.x, fy = faenger.y;
+  const fGrad = ctx.createLinearGradient(fx, fy, fx, fy + faenger.hoehe);
+  fGrad.addColorStop(0, '#4090e0');
+  fGrad.addColorStop(1, '#2060a0');
+  ctx.fillStyle = fGrad;
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, faenger.breite, faenger.hoehe, 4);
+  ctx.fill();
+
+  ctx.strokeStyle = '#60b0ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, faenger.breite, faenger.hoehe, 4);
+  ctx.stroke();
+
+  // "Fänger" Label
+  ctx.fillStyle = 'rgba(200,220,240,0.5)';
+  ctx.font = '10px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('faenger', fx + faenger.breite / 2, fy - 8);
+}
+
+function gameLoop() {
+  update();
+  draw();
+  updateUI();
+  requestAnimationFrame(gameLoop);
+}
+
+// =============================================
+// UI-Updates (Sidebar)
+// =============================================
+
+function farbCSS(name) {
+  const map = { 'rot': '#e04040', 'orange': '#e8a030', 'blau': '#4080e0', 'gruen': '#40b060' };
+  return map[name] || '#888';
+}
+
+function updateUI() {
+  // Score
+  document.getElementById('scoreZahl').textContent = score;
+
+  // Fänger-Karte
+  document.getElementById('faengerKarte').innerHTML = `
+    <div class="objekt-karte">
+      <div class="objekt-header">
+        <span>faenger</span>
+        <span class="typ">: Faenger</span>
+      </div>
+      <div class="objekt-body">
+        <div class="attr-zeile"><span class="attr-name">x</span><span class="attr-wert">${Math.round(faenger.x)}</span></div>
+        <div class="attr-zeile"><span class="attr-name">y</span><span class="attr-wert">${Math.round(faenger.y)}</span></div>
+        <div class="attr-zeile"><span class="attr-name">breite</span><span class="attr-wert">${faenger.breite}</span></div>
+      </div>
+    </div>
+  `;
+
+  // Ball-Karten
+  let html = '';
+  for (let i = 0; i < baelle.length; i++) {
+    const b = baelle[i];
+    if (b === null) {
+      html += `
+        <div class="objekt-karte gefangen">
+          <div class="objekt-header">
+            <span>baelle[${i}]</span>
+            <span class="typ">= null</span>
+          </div>
+          <div class="objekt-body" style="text-align:center;color:#5a5a5a;font-size:12px;padding:8px;">
+            ✓ gefangen & entfernt
+          </div>
+        </div>`;
+    } else {
+      const hl = (i === highlightBall) ? ' highlight' : '';
+      html += `
+        <div class="objekt-karte${hl}" onmouseenter="highlightBall=${i}" onmouseleave="highlightBall=-1">
+          <div class="objekt-header">
+            <span>baelle[${i}]</span>
+            <span class="typ">: Ball</span>
+          </div>
+          <div class="objekt-body">
+            <div class="attr-zeile">
+              <span class="attr-name">farbe</span>
+              <span class="attr-wert string"><span class="farb-punkt" style="background:${farbCSS(b.farbe)}"></span>"${b.farbe}"</span>
+            </div>
+            <div class="attr-zeile"><span class="attr-name">punkte</span><span class="attr-wert">${b.punkte}${b.punkte > 50 ? ' (>50 → orange)' : ''}</span></div>
+            <div class="attr-zeile"><span class="attr-name">radius</span><span class="attr-wert">${b.radius}</span></div>
+            <div class="attr-zeile"><span class="attr-name">x</span><span class="attr-wert">${Math.round(b.x)}</span></div>
+            <div class="attr-zeile"><span class="attr-name">y</span><span class="attr-wert">${Math.round(b.y)}</span></div>
+          </div>
+        </div>`;
+    }
+  }
+  document.getElementById('ballKarten').innerHTML = html;
+
+  // Feld-Ansicht
+  let feldHtml = '<div style="margin-bottom:8px;color:#5a8ab0;font-size:11px;">Ball[] baelle = new Ball[5];</div>';
+  for (let i = 0; i < baelle.length; i++) {
+    const b = baelle[i];
+    if (b === null) {
+      feldHtml += `<div style="padding:4px 0;"><span class="index">baelle[${i}]</span> = <span class="null-wert">null</span></div>`;
+    } else {
+      feldHtml += `<div style="padding:4px 0;"><span class="index">baelle[${i}]</span> = <span class="wert">Ball{farbe="${b.farbe}", punkte=${b.punkte}, x=${Math.round(b.x)}, y=${Math.round(b.y)}}</span></div>`;
+    }
+  }
+  feldHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #2a3a4a;color:#5a7a90;font-size:11px;">baelle.length = ${baelle.length}</div>`;
+  document.getElementById('feldAnsicht').innerHTML = feldHtml;
+}
+
+// =============================================
+// TABS & BUTTONS
+// =============================================
+
+function zeigeTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('aktiv'));
+  document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('aktiv'));
+  document.getElementById('tab-' + name).classList.add('aktiv');
+  event.target.classList.add('aktiv');
+}
+
+function spielReset() { spielInit(); }
+
+function spielPause() {
+  paused = !paused;
+  document.getElementById('btnPause').textContent = paused ? 'Weiter' : 'Pause';
+  document.getElementById('btnPause').classList.toggle('aktiv', paused);
+}
+
+function toggleSpeed() {
+  slowMode = !slowMode;
+  const btn = document.getElementById('btnSpeed');
+  btn.textContent = slowMode ? 'Normal' : 'Langsam';
+  btn.classList.toggle('aktiv', slowMode);
+}
+
+// =============================================
+// EVENTS
+// =============================================
+
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+    e.preventDefault();
+  }
+});
+
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  if (faenger) {
+    faenger.y = canvas.height - 40;
+  }
+});
+
+// =============================================
+// START
+// =============================================
+
+spielInit();
+gameLoop();
+</script>
+</body>
+</html>
