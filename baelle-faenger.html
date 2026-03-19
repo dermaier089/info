@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Bälle-Fänger – OOP interaktiv</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -13,11 +13,16 @@
     color: #e0e8f0;
     overflow: hidden;
     height: 100vh;
+    height: 100dvh;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .layout {
     display: flex;
     height: 100vh;
+    height: 100dvh;
   }
 
   /* === SPIELFELD === */
@@ -29,22 +34,25 @@
   }
 
   .spiel-header {
-    padding: 12px 20px;
+    padding: 10px 16px;
     background: #162230;
     border-bottom: 1px solid #2a3a4a;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .spiel-header h1 {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: #7eb8e0;
+    white-space: nowrap;
   }
 
   .btn {
-    padding: 6px 16px;
+    padding: 6px 14px;
     border: 1px solid #3a5a7a;
     background: #1e3248;
     color: #a0c4e0;
@@ -52,13 +60,15 @@
     cursor: pointer;
     font-size: 13px;
     transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
   }
   .btn:hover { background: #2a4a68; border-color: #5a8ab0; }
+  .btn:active { background: #2a4a68; border-color: #5a8ab0; }
   .btn.aktiv { background: #1a5a2a; border-color: #3a8a4a; color: #80e090; }
 
   .controls {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
   }
 
@@ -66,6 +76,7 @@
     flex: 1;
     position: relative;
     overflow: hidden;
+    min-height: 200px;
   }
 
   canvas {
@@ -87,12 +98,51 @@
     border: 1px solid #2a4a6a;
     pointer-events: none;
     transition: opacity 0.5s;
+    white-space: nowrap;
   }
+
+  /* === TOUCH CONTROLS === */
+  .touch-controls {
+    display: none;
+    padding: 8px 12px;
+    background: #131f2b;
+    border-top: 1px solid #2a3a4a;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .touch-btn {
+    width: 72px;
+    height: 56px;
+    border-radius: 10px;
+    border: 2px solid #3a6090;
+    background: #1a2a40;
+    color: #80b8e0;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s;
+  }
+  .touch-btn:active, .touch-btn.pressed {
+    background: #2a5080;
+    border-color: #60a0e0;
+  }
+
+  .touch-score {
+    text-align: center;
+    min-width: 60px;
+  }
+  .touch-score .zahl { font-size: 24px; font-weight: 700; color: #f0c040; }
+  .touch-score .label { font-size: 10px; color: #5a7a90; }
 
   /* === SIDEBAR === */
   .sidebar {
-    width: 380px;
-    min-width: 380px;
+    width: 340px;
+    min-width: 340px;
     background: #131f2b;
     border-left: 1px solid #2a3a4a;
     display: flex;
@@ -103,26 +153,32 @@
   .sidebar-tabs {
     display: flex;
     border-bottom: 1px solid #2a3a4a;
+    position: sticky;
+    top: 0;
+    background: #131f2b;
+    z-index: 2;
   }
 
   .sidebar-tab {
     flex: 1;
-    padding: 10px;
+    padding: 10px 4px;
     text-align: center;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #5a7a9a;
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
   }
   .sidebar-tab:hover { color: #8ab0d0; }
   .sidebar-tab.aktiv { color: #7eb8e0; border-bottom-color: #4a90c0; }
 
   .sidebar-content {
     flex: 1;
-    padding: 16px;
+    padding: 12px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .tab-panel { display: none; }
@@ -133,7 +189,7 @@
     background: #1a2a38;
     border: 1px solid #2a4050;
     border-radius: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     overflow: hidden;
     transition: border-color 0.2s;
   }
@@ -147,37 +203,36 @@
   }
 
   .objekt-header {
-    padding: 8px 12px;
+    padding: 6px 10px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
 
-  .objekt-header .typ { color: #5a8ab0; font-weight: 400; font-size: 12px; }
+  .objekt-header .typ { color: #5a8ab0; font-weight: 400; font-size: 11px; }
 
   .objekt-body {
-    padding: 6px 12px 10px;
+    padding: 4px 10px 8px;
   }
 
   .attr-zeile {
     display: flex;
     justify-content: space-between;
-    padding: 3px 0;
-    font-size: 12.5px;
+    padding: 2px 0;
+    font-size: 11.5px;
     font-family: 'Consolas', 'Fira Code', monospace;
   }
   .attr-name { color: #7a9ab8; }
   .attr-wert { color: #e0d080; font-weight: 500; }
   .attr-wert.string { color: #80c090; }
-  .attr-wert.referenz { color: #c090e0; }
 
   .farb-punkt {
     display: inline-block;
-    width: 10px; height: 10px;
+    width: 9px; height: 9px;
     border-radius: 50%;
-    margin-right: 5px;
+    margin-right: 4px;
     vertical-align: middle;
   }
 
@@ -186,83 +241,158 @@
     background: #1a2a38;
     border: 2px solid #3a6090;
     border-radius: 6px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     font-family: 'Consolas', 'Fira Code', monospace;
-    font-size: 12px;
+    font-size: 11px;
   }
   .klassen-name {
     background: #2a4a68;
-    padding: 6px 10px;
+    padding: 5px 8px;
     font-weight: 700;
     text-align: center;
     color: #a0d0f0;
-    font-size: 13px;
+    font-size: 12px;
   }
   .klassen-section {
-    padding: 6px 10px;
+    padding: 5px 8px;
     border-top: 1px solid #2a4060;
   }
-  .klassen-section div {
-    padding: 2px 0;
-    color: #90b0c8;
-  }
+  .klassen-section div { padding: 1px 0; color: #90b0c8; }
   .klassen-section .keyword { color: #c080d0; }
   .klassen-section .type { color: #60a0d0; }
 
   .beziehung-label {
     text-align: center;
-    padding: 6px;
+    padding: 5px;
     color: #6a8aa0;
-    font-size: 12px;
+    font-size: 11px;
   }
-  .beziehung-label .pfeil { font-size: 16px; color: #4a7a9a; }
+  .beziehung-label .pfeil { font-size: 14px; color: #4a7a9a; }
 
-  /* Score */
+  /* Score-Box in Sidebar */
   .score-box {
     background: #1a2a38;
     border: 1px solid #2a4050;
     border-radius: 8px;
-    padding: 14px;
-    margin-bottom: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
     text-align: center;
   }
-  .score-zahl {
-    font-size: 36px;
-    font-weight: 700;
-    color: #f0c040;
-  }
-  .score-label {
-    font-size: 12px;
-    color: #6a8aa0;
-    margin-top: 2px;
-  }
+  .score-zahl { font-size: 30px; font-weight: 700; color: #f0c040; }
+  .score-label { font-size: 11px; color: #6a8aa0; margin-top: 2px; }
 
   .feld-info {
     background: #162030;
     border: 1px solid #2a3a4a;
     border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 12px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
     font-family: 'Consolas', monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #7a9ab8;
   }
   .feld-info .index { color: #5a7a90; }
   .feld-info .wert { color: #e0d080; }
   .feld-info .null-wert { color: #6a4a4a; }
 
-  /* Legende */
   .legende {
     background: #162030;
     border: 1px solid #2a3a4a;
     border-radius: 6px;
-    padding: 10px 12px;
-    margin-top: 12px;
-    font-size: 12px;
+    padding: 8px 10px;
+    margin-top: 10px;
+    font-size: 11px;
     color: #6a8aa0;
     line-height: 1.6;
   }
   .legende strong { color: #a0c0d8; }
+
+  /* === SIDEBAR TOGGLE (mobile/tablet) === */
+  .sidebar-toggle {
+    display: none;
+    position: fixed;
+    bottom: 80px;
+    right: 12px;
+    z-index: 100;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid #3a6090;
+    background: #1a2a40;
+    color: #80b8e0;
+    font-size: 20px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+
+  /* ============================================
+     RESPONSIVE: Tablet quer (<=1100px)
+     ============================================ */
+  @media (max-width: 1100px) {
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+    }
+  }
+
+  /* ============================================
+     RESPONSIVE: Tablet hoch / kleine Tablets
+     ============================================ */
+  @media (max-width: 860px) {
+    .layout {
+      flex-direction: column;
+    }
+
+    .spiel-bereich {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .canvas-wrap {
+      flex: 1;
+    }
+
+    .sidebar {
+      width: 100%;
+      min-width: 0;
+      max-height: 45vh;
+      border-left: none;
+      border-top: 1px solid #2a3a4a;
+    }
+
+    .sidebar.versteckt {
+      display: none;
+    }
+
+    .sidebar-toggle {
+      display: flex;
+    }
+
+    .touch-controls {
+      display: flex;
+    }
+  }
+
+  /* ============================================
+     RESPONSIVE: Handy
+     ============================================ */
+  @media (max-width: 560px) {
+    .spiel-header h1 { font-size: 14px; }
+    .btn { padding: 5px 10px; font-size: 12px; }
+
+    .sidebar {
+      max-height: 50vh;
+    }
+
+    .touch-btn {
+      width: 64px;
+      height: 50px;
+      font-size: 24px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -270,24 +400,36 @@
 <div class="layout">
   <div class="spiel-bereich">
     <div class="spiel-header">
-      <h1>🎮 Bälle-Fänger Spiel</h1>
+      <h1>Bälle-Fänger Spiel</h1>
       <div class="controls">
-        <button class="btn" id="btnReset" onclick="spielReset()">Neu starten</button>
+        <button class="btn" id="btnReset" onclick="spielReset()">Neu</button>
         <button class="btn" id="btnPause" onclick="spielPause()">Pause</button>
         <button class="btn" id="btnSpeed" onclick="toggleSpeed()">Langsam</button>
       </div>
     </div>
     <div class="canvas-wrap">
       <canvas id="spielfeld"></canvas>
-      <div class="overlay-hint" id="hint">← → Pfeiltasten zum Steuern</div>
+      <div class="overlay-hint" id="hint">← → Pfeiltasten oder Touch zum Steuern</div>
+    </div>
+    <!-- Touch-Steuerung für Tablet/Handy -->
+    <div class="touch-controls" id="touchControls">
+      <div class="touch-btn" id="btnLeft">◀</div>
+      <div class="touch-score">
+        <div class="zahl" id="touchScore">0</div>
+        <div class="label">gefangen</div>
+      </div>
+      <div class="touch-btn" id="btnRight">▶</div>
     </div>
   </div>
 
-  <div class="sidebar">
+  <!-- Sidebar toggle button for mobile -->
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">📋</button>
+
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-tabs">
-      <div class="sidebar-tab aktiv" onclick="zeigeTab('objekte')">Objekte</div>
-      <div class="sidebar-tab" onclick="zeigeTab('klassen')">Klassendiagramm</div>
-      <div class="sidebar-tab" onclick="zeigeTab('feld')">Feld-Ansicht</div>
+      <div class="sidebar-tab aktiv" data-tab="objekte" onclick="zeigeTab('objekte', this)">Objekte</div>
+      <div class="sidebar-tab" data-tab="klassen" onclick="zeigeTab('klassen', this)">Klassen</div>
+      <div class="sidebar-tab" data-tab="feld" onclick="zeigeTab('feld', this)">Feld</div>
     </div>
     <div class="sidebar-content">
 
@@ -318,10 +460,10 @@
         </div>
 
         <div class="beziehung-label">
-          <span class="pfeil">▼</span> enthält 1 &nbsp;&nbsp;&nbsp; <span class="pfeil">▼</span> enthält n
+          <span class="pfeil">▼</span> enthält 1 &nbsp;&nbsp; <span class="pfeil">▼</span> enthält n
         </div>
 
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:8px;">
           <div class="klassen-box" style="flex:1;">
             <div class="klassen-name">FAENGER</div>
             <div class="klassen-section">
@@ -332,7 +474,7 @@
             <div class="klassen-section">
               <div>nachLinks()</div>
               <div>nachRechts()</div>
-              <div>beruehrt(<span class="type">Ball</span> b): <span class="type">boolean</span></div>
+              <div>beruehrt(<span class="type">Ball</span>): <span class="type">boolean</span></div>
             </div>
           </div>
 
@@ -345,27 +487,27 @@
               <div><span class="type">int</span> x, y</div>
             </div>
             <div class="klassen-section">
-              <div>Konstruktor(<span class="type">String</span> f, <span class="type">int</span> p)</div>
-              <div>RadiusSetzen(<span class="type">int</span> r)</div>
-              <div>PositionSetzen(<span class="type">int</span> x, <span class="type">int</span> y)</div>
-              <div>FarbeSetzen(<span class="type">String</span> f)</div>
+              <div>Konstruktor(<span class="type">String</span>, <span class="type">int</span>)</div>
+              <div>RadiusSetzen(<span class="type">int</span>)</div>
+              <div>PositionSetzen(<span class="type">int</span>, <span class="type">int</span>)</div>
+              <div>FarbeSetzen(<span class="type">String</span>)</div>
               <div>punkteGeben(): <span class="type">int</span></div>
               <div>Entfernen()</div>
             </div>
           </div>
         </div>
 
-        <div class="legende" style="margin-top: 16px;">
+        <div class="legende" style="margin-top: 12px;">
           <strong>Beziehungen:</strong><br>
           SPIEL <strong>enthält 1</strong> FAENGER (Referenzattribut)<br>
           SPIEL <strong>enthält n</strong> BALL (Feld/Array)<br><br>
-          <strong>Kapselung:</strong> Attribute sind <code>private</code> — Zugriff nur über Methoden (Getter/Setter).
+          <strong>Kapselung:</strong> Attribute sind <code>private</code> — Zugriff nur über Methoden.
         </div>
       </div>
 
       <!-- TAB: Feld-Ansicht -->
       <div class="tab-panel" id="tab-feld">
-        <div style="margin-bottom:12px; color:#7a9ab8; font-size:13px;">
+        <div style="margin-bottom:10px; color:#7a9ab8; font-size:12px;">
           <strong>baelle: Ball[]</strong> — Das Feld im Überblick
         </div>
         <div class="feld-info" id="feldAnsicht"></div>
@@ -373,12 +515,12 @@
           <strong>So funktioniert das Feld:</strong><br>
           • <code>baelle = new Ball[5]</code> erzeugt 5 Plätze<br>
           • Jeder Platz speichert eine <strong>Referenz</strong> auf ein Ball-Objekt<br>
-          • <code>baelle[i] = null</code> → Platz ist leer (Ball gefangen)<br>
-          • <code>baelle.length</code> = 5 (Größe des Feldes)<br><br>
+          • <code>baelle[i] = null</code> → Platz leer (Ball gefangen)<br>
+          • <code>baelle.length</code> = 5<br><br>
           <strong>foo() prüft für jeden Platz:</strong><br>
           1. Ist der Platz nicht null?<br>
           2. Berührt der Ball den Fänger?<br>
-          3. Wenn ja → Ball entfernen, Platz auf null setzen
+          3. Wenn ja → entfernen, Platz = null
         </div>
       </div>
 
@@ -388,7 +530,7 @@
 
 <script>
 // =============================================
-// KLASSEN (wie in der Aufgabe)
+// KLASSEN
 // =============================================
 
 class Ball {
@@ -403,13 +545,11 @@ class Ball {
     this.gefangen = false;
     this.blinkTimer = 0;
   }
-
   RadiusSetzen(r) { this.radius = r; }
   PositionSetzen(x, y) { this.x = x; this.y = y; }
   FarbeSetzen(f) { this.farbe = f; }
   punkteGeben() { return this.punkte; }
   farbeGeben() { return this.farbe; }
-
   Entfernen() {
     this.entfernt = true;
     this.gefangen = true;
@@ -425,10 +565,8 @@ class Faenger {
     this.y = canvasH - 40;
     this.speed = 7;
   }
-
   nachLinks() { this.x = Math.max(0, this.x - this.speed); }
   nachRechts(maxX) { this.x = Math.min(maxX - this.breite, this.x + this.speed); }
-
   beruehrt(ball) {
     if (!ball || ball.entfernt) return false;
     const bx = ball.x, by = ball.y, br = ball.radius;
@@ -451,6 +589,7 @@ const ctx = canvas.getContext('2d');
 let faenger, baelle, score, paused, slowMode, hintVisible;
 let keys = {};
 let highlightBall = -1;
+let uiThrottle = 0;
 
 function zufall(max) {
   return Math.floor(Math.random() * (max + 1));
@@ -461,24 +600,24 @@ function spielInit() {
   faenger = new Faenger(canvas.width, canvas.height);
   baelle = new Array(5);
 
-  // Aufgabe d) + e): Feld füllen
   for (let i = 0; i < baelle.length; i++) {
     baelle[i] = new Ball("rot", zufall(100));
     baelle[i].RadiusSetzen(20);
     baelle[i].PositionSetzen(zufall(canvas.width - 40) + 20, -(zufall(100)));
   }
 
-  // Aufgabe g): Bälle mit > 50 Punkten orange färben
   BaelleFaerben("orange");
 
   score = 0;
   paused = false;
   slowMode = false;
   hintVisible = true;
+  document.getElementById('hint').style.opacity = '1';
+  document.getElementById('btnPause').textContent = 'Pause';
+  document.getElementById('btnPause').classList.remove('aktiv');
   updateUI();
 }
 
-// Aufgabe g)
 function BaelleFaerben(farbe) {
   for (let i = 0; i < baelle.length; i++) {
     if (baelle[i] !== null && baelle[i].punkteGeben() > 50) {
@@ -487,7 +626,6 @@ function BaelleFaerben(farbe) {
   }
 }
 
-// Aufgabe f): foo() — prüft Kollision und entfernt gefangene Bälle
 function foo() {
   for (let i = 0; i < baelle.length; i++) {
     if (baelle[i] !== null && !baelle[i].entfernt) {
@@ -511,39 +649,30 @@ function resizeCanvas() {
 
 function update() {
   if (paused) return;
-
   const speedFactor = slowMode ? 0.35 : 1;
 
-  // Steuerung
-  if (keys['ArrowLeft'] || keys['a']) faenger.nachLinks();
-  if (keys['ArrowRight'] || keys['d']) faenger.nachRechts(canvas.width);
+  if (keys['ArrowLeft'] || keys['a'] || keys['touchLeft']) faenger.nachLinks();
+  if (keys['ArrowRight'] || keys['d'] || keys['touchRight']) faenger.nachRechts(canvas.width);
 
-  // Bälle bewegen
   for (let i = 0; i < baelle.length; i++) {
     if (baelle[i] !== null && !baelle[i].entfernt) {
       baelle[i].y += baelle[i].speed * 2 * speedFactor;
-
-      // Unten angekommen → wieder oben starten
       if (baelle[i].y - baelle[i].radius > canvas.height) {
         baelle[i].y = -(zufall(80));
         baelle[i].x = zufall(canvas.width - 60) + 30;
       }
     }
-
-    // Blink-Animation bei Fang
     if (baelle[i] !== null && baelle[i].blinkTimer > 0) {
       baelle[i].blinkTimer--;
       if (baelle[i].blinkTimer <= 0) {
-        baelle[i] = null; // Aus dem Feld entfernen
+        baelle[i] = null;
       }
     }
   }
 
-  // foo() — Kollisionsprüfung
   foo();
 
-  // Hint ausblenden
-  if (hintVisible && (keys['ArrowLeft'] || keys['ArrowRight'])) {
+  if (hintVisible && (keys['ArrowLeft'] || keys['ArrowRight'] || keys['touchLeft'] || keys['touchRight'])) {
     hintVisible = false;
     document.getElementById('hint').style.opacity = '0';
   }
@@ -553,7 +682,6 @@ function draw() {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // Hintergrund-Gitter
   ctx.strokeStyle = 'rgba(40, 60, 80, 0.3)';
   ctx.lineWidth = 1;
   for (let x = 0; x < w; x += 50) {
@@ -563,7 +691,6 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
   }
 
-  // Bälle zeichnen
   const farbMap = {
     'rot': '#e04040', 'orange': '#e8a030', 'blau': '#4080e0',
     'gruen': '#40b060', 'gelb': '#e0d040'
@@ -572,19 +699,14 @@ function draw() {
   for (let i = 0; i < baelle.length; i++) {
     const b = baelle[i];
     if (!b) continue;
-
     const color = farbMap[b.farbe] || b.farbe;
-
-    // Blink bei Fang
     if (b.blinkTimer > 0 && b.blinkTimer % 6 < 3) continue;
 
-    // Schatten
     ctx.beginPath();
     ctx.arc(b.x + 2, b.y + 2, b.radius, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fill();
 
-    // Ball
     ctx.beginPath();
     ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
     const grad = ctx.createRadialGradient(b.x - 5, b.y - 5, 2, b.x, b.y, b.radius);
@@ -594,27 +716,24 @@ function draw() {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Highlight-Ring
     if (i === highlightBall) {
       ctx.strokeStyle = '#f0c040';
       ctx.lineWidth = 3;
       ctx.stroke();
     }
 
-    // Punkte-Zahl auf dem Ball
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 13px Segoe UI, sans-serif';
+    ctx.font = `bold ${Math.max(11, b.radius * 0.65)}px Segoe UI, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(b.punkte, b.x, b.y);
 
-    // Index-Label
     ctx.fillStyle = 'rgba(200,220,240,0.6)';
     ctx.font = '10px Consolas, monospace';
     ctx.fillText('[' + i + ']', b.x, b.y - b.radius - 8);
   }
 
-  // Fänger zeichnen
+  // Fänger
   const fx = faenger.x, fy = faenger.y;
   const fGrad = ctx.createLinearGradient(fx, fy, fx, fy + faenger.hoehe);
   fGrad.addColorStop(0, '#4090e0');
@@ -623,14 +742,12 @@ function draw() {
   ctx.beginPath();
   ctx.roundRect(fx, fy, faenger.breite, faenger.hoehe, 4);
   ctx.fill();
-
   ctx.strokeStyle = '#60b0ff';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(fx, fy, faenger.breite, faenger.hoehe, 4);
   ctx.stroke();
 
-  // "Fänger" Label
   ctx.fillStyle = 'rgba(200,220,240,0.5)';
   ctx.font = '10px Consolas, monospace';
   ctx.textAlign = 'center';
@@ -640,12 +757,16 @@ function draw() {
 function gameLoop() {
   update();
   draw();
-  updateUI();
+
+  // Throttle UI updates (DOM is expensive)
+  uiThrottle++;
+  if (uiThrottle % 6 === 0) updateUI();
+
   requestAnimationFrame(gameLoop);
 }
 
 // =============================================
-// UI-Updates (Sidebar)
+// UI-Updates
 // =============================================
 
 function farbCSS(name) {
@@ -654,10 +775,10 @@ function farbCSS(name) {
 }
 
 function updateUI() {
-  // Score
   document.getElementById('scoreZahl').textContent = score;
+  const ts = document.getElementById('touchScore');
+  if (ts) ts.textContent = score;
 
-  // Fänger-Karte
   document.getElementById('faengerKarte').innerHTML = `
     <div class="objekt-karte">
       <div class="objekt-header">
@@ -669,10 +790,8 @@ function updateUI() {
         <div class="attr-zeile"><span class="attr-name">y</span><span class="attr-wert">${Math.round(faenger.y)}</span></div>
         <div class="attr-zeile"><span class="attr-name">breite</span><span class="attr-wert">${faenger.breite}</span></div>
       </div>
-    </div>
-  `;
+    </div>`;
 
-  // Ball-Karten
   let html = '';
   for (let i = 0; i < baelle.length; i++) {
     const b = baelle[i];
@@ -680,11 +799,10 @@ function updateUI() {
       html += `
         <div class="objekt-karte gefangen">
           <div class="objekt-header">
-            <span>baelle[${i}]</span>
-            <span class="typ">= null</span>
+            <span>baelle[${i}]</span><span class="typ">= null</span>
           </div>
-          <div class="objekt-body" style="text-align:center;color:#5a5a5a;font-size:12px;padding:8px;">
-            ✓ gefangen & entfernt
+          <div class="objekt-body" style="text-align:center;color:#5a5a5a;font-size:11px;padding:6px;">
+            gefangen & entfernt
           </div>
         </div>`;
     } else {
@@ -692,15 +810,14 @@ function updateUI() {
       html += `
         <div class="objekt-karte${hl}" onmouseenter="highlightBall=${i}" onmouseleave="highlightBall=-1">
           <div class="objekt-header">
-            <span>baelle[${i}]</span>
-            <span class="typ">: Ball</span>
+            <span>baelle[${i}]</span><span class="typ">: Ball</span>
           </div>
           <div class="objekt-body">
             <div class="attr-zeile">
               <span class="attr-name">farbe</span>
               <span class="attr-wert string"><span class="farb-punkt" style="background:${farbCSS(b.farbe)}"></span>"${b.farbe}"</span>
             </div>
-            <div class="attr-zeile"><span class="attr-name">punkte</span><span class="attr-wert">${b.punkte}${b.punkte > 50 ? ' (>50 → orange)' : ''}</span></div>
+            <div class="attr-zeile"><span class="attr-name">punkte</span><span class="attr-wert">${b.punkte}${b.punkte > 50 ? ' (>50)' : ''}</span></div>
             <div class="attr-zeile"><span class="attr-name">radius</span><span class="attr-wert">${b.radius}</span></div>
             <div class="attr-zeile"><span class="attr-name">x</span><span class="attr-wert">${Math.round(b.x)}</span></div>
             <div class="attr-zeile"><span class="attr-name">y</span><span class="attr-wert">${Math.round(b.y)}</span></div>
@@ -710,17 +827,16 @@ function updateUI() {
   }
   document.getElementById('ballKarten').innerHTML = html;
 
-  // Feld-Ansicht
-  let feldHtml = '<div style="margin-bottom:8px;color:#5a8ab0;font-size:11px;">Ball[] baelle = new Ball[5];</div>';
+  let feldHtml = '<div style="margin-bottom:6px;color:#5a8ab0;font-size:10px;">Ball[] baelle = new Ball[5];</div>';
   for (let i = 0; i < baelle.length; i++) {
     const b = baelle[i];
     if (b === null) {
-      feldHtml += `<div style="padding:4px 0;"><span class="index">baelle[${i}]</span> = <span class="null-wert">null</span></div>`;
+      feldHtml += `<div style="padding:3px 0;"><span class="index">[${i}]</span> = <span class="null-wert">null</span></div>`;
     } else {
-      feldHtml += `<div style="padding:4px 0;"><span class="index">baelle[${i}]</span> = <span class="wert">Ball{farbe="${b.farbe}", punkte=${b.punkte}, x=${Math.round(b.x)}, y=${Math.round(b.y)}}</span></div>`;
+      feldHtml += `<div style="padding:3px 0;"><span class="index">[${i}]</span> = <span class="wert">Ball{"${b.farbe}", ${b.punkte}pt, ${Math.round(b.x)},${Math.round(b.y)}}</span></div>`;
     }
   }
-  feldHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #2a3a4a;color:#5a7a90;font-size:11px;">baelle.length = ${baelle.length}</div>`;
+  feldHtml += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #2a3a4a;color:#5a7a90;font-size:10px;">baelle.length = ${baelle.length}</div>`;
   document.getElementById('feldAnsicht').innerHTML = feldHtml;
 }
 
@@ -728,11 +844,11 @@ function updateUI() {
 // TABS & BUTTONS
 // =============================================
 
-function zeigeTab(name) {
+function zeigeTab(name, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('aktiv'));
   document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('aktiv'));
   document.getElementById('tab-' + name).classList.add('aktiv');
-  event.target.classList.add('aktiv');
+  if (el) el.classList.add('aktiv');
 }
 
 function spielReset() { spielInit(); }
@@ -750,8 +866,13 @@ function toggleSpeed() {
   btn.classList.toggle('aktiv', slowMode);
 }
 
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('versteckt');
+}
+
 // =============================================
-// EVENTS
+// KEYBOARD EVENTS
 // =============================================
 
 window.addEventListener('keydown', e => {
@@ -760,13 +881,93 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
   }
 });
-
 window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// =============================================
+// TOUCH EVENTS
+// =============================================
+
+function setupTouchBtn(id, keyName) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+
+  const start = (e) => {
+    e.preventDefault();
+    keys[keyName] = true;
+    btn.classList.add('pressed');
+  };
+  const end = (e) => {
+    e.preventDefault();
+    keys[keyName] = false;
+    btn.classList.remove('pressed');
+  };
+
+  btn.addEventListener('touchstart', start, { passive: false });
+  btn.addEventListener('touchend', end, { passive: false });
+  btn.addEventListener('touchcancel', end, { passive: false });
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', end);
+  btn.addEventListener('mouseleave', end);
+}
+
+setupTouchBtn('btnLeft', 'touchLeft');
+setupTouchBtn('btnRight', 'touchRight');
+
+// Swipe on canvas for touch
+let touchStartX = null;
+let touchActive = false;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const relX = touch.clientX - rect.left;
+
+  // Tap left/right half to move
+  if (relX < rect.width / 2) {
+    keys['touchLeft'] = true;
+  } else {
+    keys['touchRight'] = true;
+  }
+  touchActive = true;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!touchActive) return;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const relX = touch.clientX - rect.left;
+
+  keys['touchLeft'] = relX < rect.width / 2;
+  keys['touchRight'] = relX >= rect.width / 2;
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  keys['touchLeft'] = false;
+  keys['touchRight'] = false;
+  touchActive = false;
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', (e) => {
+  keys['touchLeft'] = false;
+  keys['touchRight'] = false;
+  touchActive = false;
+});
+
+// =============================================
+// RESIZE
+// =============================================
 
 window.addEventListener('resize', () => {
   resizeCanvas();
   if (faenger) {
     faenger.y = canvas.height - 40;
+    // Faenger im sichtbaren Bereich halten
+    if (faenger.x + faenger.breite > canvas.width) {
+      faenger.x = canvas.width - faenger.breite;
+    }
   }
 });
 
