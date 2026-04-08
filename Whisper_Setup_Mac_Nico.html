@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Was Claude Code kann - Ein Beispiel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a0a; color: #e0e0e0; }
+
+  .slide { display: none; min-height: 100vh; padding: 48px 24px; flex-direction: column; justify-content: center; align-items: center; }
+  .slide.active { display: flex; }
+
+  .card { max-width: 640px; width: 100%; background: #1a1a1a; border-radius: 16px; padding: 40px; border: 1px solid #2a2a2a; }
+
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 20px; margin-bottom: 20px; letter-spacing: 0.5px; }
+  .tag-story { background: #1a1a3a; color: #818cf8; }
+  .tag-claude { background: #0a2a1a; color: #4ade80; }
+  .tag-result { background: #2a1a0a; color: #ff6b00; }
+
+  h1 { font-size: 32px; margin-bottom: 16px; color: #fff; line-height: 1.3; }
+  h2 { font-size: 20px; margin-bottom: 16px; color: #fff; }
+  p { font-size: 15px; line-height: 1.7; color: #999; margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .chat { margin: 20px 0; display: flex; flex-direction: column; gap: 12px; }
+  .msg { padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; max-width: 90%; }
+  .msg-user { background: #2a2a3a; color: #c0c0e0; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg-claude { background: #0f1f15; color: #a0d0b0; align-self: flex-start; border-bottom-left-radius: 4px; border-left: 2px solid #4ade80; }
+  .msg-label { font-size: 11px; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .highlight { background: #111; border: 1px solid #333; border-radius: 10px; padding: 16px; margin: 16px 0; font-size: 14px; color: #ccc; line-height: 1.7; }
+  .highlight strong { color: #ff6b00; }
+
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid #222; }
+  .btn { padding: 10px 24px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-next { background: #ff6b00; color: #fff; }
+  .btn-next:hover { background: #ff8533; }
+  .btn-prev { background: #222; color: #888; }
+  .btn-prev:hover { background: #333; color: #fff; }
+
+  .progress { position: fixed; top: 0; left: 0; height: 3px; background: #ff6b00; transition: width 0.4s; z-index: 100; }
+  .counter { color: #555; font-size: 13px; }
+
+  .emoji { font-size: 48px; margin-bottom: 20px; display: block; }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<!-- 0: Intro -->
+<div class="slide active" id="slide-0">
+  <div class="card">
+    <span class="emoji">&#128172;</span>
+    <h1>Wie ich mit Claude Code ein Audio-Transkriptions-Tool gebaut habe</h1>
+    <p>Ohne Programmierkenntnisse. Einfach durch ein Gespraech.</p>
+    <p style="color:#666;">Das hier ist die Geschichte eines echten Dialogs. Ich zeige dir Schritt fuer Schritt, wie Claude Code mir geholfen hat &mdash; und wie du das Gleiche machen kannst.</p>
+    <div class="nav">
+      <div></div>
+      <button class="btn btn-next" onclick="go(1)">Geschichte starten &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 1: Das Problem -->
+<div class="slide" id="slide-1">
+  <div class="card">
+    <span class="tag tag-story">Der Anfang</span>
+    <h2>Ich hatte ein einfaches Problem</h2>
+    <p>Ich hatte MP3-Dateien &mdash; aufgenommene Gespraeche &mdash; und wollte die als Text haben. Keine Ahnung wie. Also hab ich einfach Claude gefragt:</p>
+    <div class="chat">
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Ich habe MP3-Dateien (Gespraeche), die moechte ich als Textdatei haben.</div></div>
+    </div>
+    <p>Das wars. Kein technisches Wissen noetig. Einfach sagen, was man will.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(0)">&larr;</button>
+      <span class="counter" id="counter-1"></span>
+      <button class="btn btn-next" onclick="go(2)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2: Claude fragt nach -->
+<div class="slide" id="slide-2">
+  <div class="card">
+    <span class="tag tag-claude">Claude reagiert</span>
+    <h2>Claude fragt nach &amp; schlaegt vor</h2>
+    <p>Claude hat nicht einfach irgendwas gemacht. Er hat zuerst gefragt, was mir am besten passt:</p>
+    <div class="chat">
+      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Welchen Ansatz bevorzugst du?<br>&#10095; Whisper (lokal, kostenlos)<br>&#10095; faster-whisper<br>&#10095; Azure Speech Service</div></div>
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Whisper, lokal und kostenlos klingt gut.</div></div>
+    </div>
+    <p>Dann hat Claude <strong>selbststaendig</strong> geprueft, ob Python installiert ist, Whisper installiert, und die Transkription gestartet.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(1)">&larr;</button>
+      <span class="counter" id="counter-2"></span>
+      <button class="btn btn-next" onclick="go(3)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3: Es funktioniert -->
+<div class="slide" id="slide-3">
+  <div class="card">
+    <span class="tag tag-result">Ergebnis</span>
+    <h2>Nach ein paar Minuten: fertig</h2>
+    <p>Claude hat alles alleine gemacht:</p>
+    <div class="highlight">
+      &#10003; Python gecheckt<br>
+      &#10003; Whisper installiert<br>
+      &#10003; Meine MP3-Datei transkribiert<br>
+      &#10003; Text als .txt gespeichert (21.000 Zeichen)
+    </div>
+    <p>Ich musste <strong>nichts</strong> selber tippen oder installieren. Claude hat meinen Computer benutzt und alles eingerichtet.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(2)">&larr;</button>
+      <span class="counter" id="counter-3"></span>
+      <button class="btn btn-next" onclick="go(4)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 4: Problem erkennen -->
+<div class="slide" id="slide-4">
+  <div class="card">
+    <span class="tag tag-story">Plot Twist</span>
+    <h2>Ich habe nachgefragt &mdash; Claude hat optimiert</h2>
+    <p>Mir ist aufgefallen, dass es auf der CPU lief statt auf der Grafikkarte. Also habe ich einfach gefragt:</p>
+    <div class="chat">
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Warum lief es nicht auf GPU?</div></div>
+      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Deine Python-Version (3.14) ist zu neu &mdash; PyTorch bietet dafuer noch keine GPU-Unterstuetzung. Loesung: Python 3.12 parallel installieren.</div></div>
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Dann downgraden.</div></div>
+    </div>
+    <p>Claude hat Python 3.12 installiert, PyTorch mit GPU-Support eingerichtet, und alles getestet. <strong>5-10x schneller.</strong></p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(3)">&larr;</button>
+      <span class="counter" id="counter-4"></span>
+      <button class="btn btn-next" onclick="go(5)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 5: Skill-Idee -->
+<div class="slide" id="slide-5">
+  <div class="card">
+    <span class="tag tag-story">Die Idee</span>
+    <h2>Ich will das oefter machen &mdash; was nun?</h2>
+    <p>Jetzt kam der spannende Teil. Ich wollte das nicht jedes Mal manuell machen:</p>
+    <div class="chat">
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Ich moechte so etwas oefter machen. Audiodateien transkribieren und die Texte dann per AI checken lassen. Was waere best practice? Ein Skill?</div></div>
+      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Ja, ein Skill ist hier die beste Wahl! Damit kannst du z.B. <strong>/transcribe ~/aufnahmen</strong> aufrufen und er transkribiert alle Dateien und analysiert sie.</div></div>
+    </div>
+    <p>Claude hat dann nachgefragt, was genau ich brauche &mdash; Analyse-Art, Formate, Output-Format, Modellgroesse.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(4)">&larr;</button>
+      <span class="counter" id="counter-5"></span>
+      <button class="btn btn-next" onclick="go(6)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 6: Was ist ein Skill -->
+<div class="slide" id="slide-6">
+  <div class="card">
+    <span class="tag tag-claude">Erklaerung</span>
+    <h2>Was ist ein "Skill"?</h2>
+    <p>Ein Skill ist wie ein <strong>Kurzbefehl</strong> fuer Claude Code. Statt jedes Mal alles zu erklaeren, tippst du einfach:</p>
+    <div class="highlight" style="font-family: monospace; color: #4ade80; text-align: center; font-size: 18px;">
+      /transcribe ~/Desktop/aufnahmen
+    </div>
+    <p>Und Claude weiss sofort:</p>
+    <div class="highlight">
+      &#10095; Welches Tool er nutzen soll (Whisper)<br>
+      &#10095; Welche Einstellungen (Modell, Sprache)<br>
+      &#10095; Was er mit dem Ergebnis machen soll (AI-Analyse)<br>
+      &#10095; Wo er die Ergebnisse speichern soll
+    </div>
+    <p>Claude erstellt den Skill fuer dich &mdash; du musst ihn nicht programmieren.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(5)">&larr;</button>
+      <span class="counter" id="counter-6"></span>
+      <button class="btn btn-next" onclick="go(7)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 7: Das Prinzip -->
+<div class="slide" id="slide-7">
+  <div class="card">
+    <span class="tag tag-result">Das Prinzip</span>
+    <h2>So arbeitet man mit Claude Code</h2>
+    <div class="highlight">
+      <strong>1.</strong> Sag was du willst &mdash; in normaler Sprache<br><br>
+      <strong>2.</strong> Claude fragt nach, wenn etwas unklar ist<br><br>
+      <strong>3.</strong> Claude setzt es um &mdash; installiert, programmiert, testet<br><br>
+      <strong>4.</strong> Du sagst, was nicht passt &mdash; Claude verbessert<br><br>
+      <strong>5.</strong> Wenns oefter gebraucht wird &rarr; Skill erstellen lassen
+    </div>
+    <p>Du brauchst <strong>kein IT-Know-how</strong>. Du musst nur wissen, was du willst. Claude kuemmert sich um das Wie.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(6)">&larr;</button>
+      <span class="counter" id="counter-7"></span>
+      <button class="btn btn-next" onclick="go(8)">Weiter &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- 8: Fuer Nico -->
+<div class="slide" id="slide-8">
+  <div class="card">
+    <span class="emoji">&#128640;</span>
+    <h2>Probier es selbst aus, Nico!</h2>
+    <p>Alles, was du brauchst:</p>
+    <div class="highlight">
+      <strong>1.</strong> Installiere Claude Code auf deinem Mac<br>
+      &nbsp;&nbsp;&nbsp;&rarr; <span style="color:#4ade80;">Terminal oeffnen, dann:</span> <span style="font-family:monospace;color:#ff6b00;">npm install -g @anthropic-ai/claude-code</span><br><br>
+      <strong>2.</strong> Starte Claude Code<br>
+      &nbsp;&nbsp;&nbsp;&rarr; <span style="font-family:monospace;color:#ff6b00;">claude</span> im Terminal eingeben<br><br>
+      <strong>3.</strong> Sag einfach, was du willst<br>
+      &nbsp;&nbsp;&nbsp;&rarr; z.B. <em>"Ich habe MP3-Dateien auf dem Desktop, die moechte ich als Text"</em>
+    </div>
+    <p style="color:#4ade80; font-weight: 600; margin-top: 20px;">Claude macht den Rest.</p>
+    <div class="nav">
+      <button class="btn btn-prev" onclick="go(7)">&larr;</button>
+      <span class="counter" id="counter-8"></span>
+      <div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const total = 9;
+let cur = 0;
+function go(n) {
+  document.getElementById('slide-'+cur).classList.remove('active');
+  cur = n;
+  document.getElementById('slide-'+cur).classList.add('active');
+  document.getElementById('progress').style.width = (cur/(total-1)*100)+'%';
+  for(let i=1;i<total;i++){
+    const c=document.getElementById('counter-'+i);
+    if(c) c.textContent=i+'/'+(total-1);
+  }
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'&&cur<total-1) go(cur+1);
+  if(e.key==='ArrowLeft'&&cur>0) go(cur-1);
+});
+</script>
+</body>
+</html>
