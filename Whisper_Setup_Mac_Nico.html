@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Was Claude Code kann - Ein Beispiel</title>
+<title>Was Claude alles kann - Ein Beispiel</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a0a; color: #e0e0e0; }
@@ -52,9 +52,9 @@
 <div class="slide active" id="slide-0">
   <div class="card">
     <span class="emoji">&#128172;</span>
-    <h1>Wie ich mit Claude Code ein Audio-Transkriptions-Tool gebaut habe</h1>
+    <h1>Wie ich mit Claude ein Audio-Transkriptions-Tool gebaut habe</h1>
     <p>Ohne Programmierkenntnisse. Einfach durch ein Gespraech.</p>
-    <p style="color:#666;">Das hier ist die Geschichte eines echten Dialogs. Ich zeige dir Schritt fuer Schritt, wie Claude Code mir geholfen hat &mdash; und wie du das Gleiche machen kannst.</p>
+    <p style="color:#666;">Das hier ist die Geschichte eines echten Dialogs mit der Claude Desktop App. Ich zeige dir, wie Claude mir geholfen hat &mdash; und wie du das Gleiche machen kannst.</p>
     <div class="nav">
       <div></div>
       <button class="btn btn-next" onclick="go(1)">Geschichte starten &rarr;</button>
@@ -106,8 +106,8 @@
     <h2>Nach ein paar Minuten: fertig</h2>
     <p>Claude hat alles alleine gemacht:</p>
     <div class="highlight">
-      &#10003; Python gecheckt<br>
-      &#10003; Whisper installiert<br>
+      &#10003; Geschaut was auf meinem Rechner vorhanden ist<br>
+      &#10003; Fehlende Software installiert<br>
       &#10003; Meine MP3-Datei transkribiert<br>
       &#10003; Text als .txt gespeichert (21.000 Zeichen)
     </div>
@@ -125,13 +125,13 @@
   <div class="card">
     <span class="tag tag-story">Plot Twist</span>
     <h2>Ich habe nachgefragt &mdash; Claude hat optimiert</h2>
-    <p>Mir ist aufgefallen, dass es auf der CPU lief statt auf der Grafikkarte. Also habe ich einfach gefragt:</p>
+    <p>Mir ist aufgefallen, dass es langsamer lief als erwartet. Also habe ich einfach gefragt:</p>
     <div class="chat">
-      <div><div class="msg-label">Ich</div><div class="msg msg-user">Warum lief es nicht auf GPU?</div></div>
-      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Deine Python-Version (3.14) ist zu neu &mdash; PyTorch bietet dafuer noch keine GPU-Unterstuetzung. Loesung: Python 3.12 parallel installieren.</div></div>
-      <div><div class="msg-label">Ich</div><div class="msg msg-user">Dann downgraden.</div></div>
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Warum lief das nicht auf der Grafikkarte?</div></div>
+      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Deine Python-Version ist zu neu dafuer. Ich installiere eine kompatible Version und richte alles ein.</div></div>
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Mach das.</div></div>
     </div>
-    <p>Claude hat Python 3.12 installiert, PyTorch mit GPU-Support eingerichtet, und alles getestet. <strong>5-10x schneller.</strong></p>
+    <p>Claude hat das Problem erkannt, geloest und alles getestet. Ergebnis: <strong>5-10x schneller.</strong></p>
     <div class="nav">
       <button class="btn btn-prev" onclick="go(3)">&larr;</button>
       <span class="counter" id="counter-4"></span>
@@ -140,17 +140,17 @@
   </div>
 </div>
 
-<!-- 5: Skill-Idee -->
+<!-- 5: Oefter machen -->
 <div class="slide" id="slide-5">
   <div class="card">
-    <span class="tag tag-story">Die Idee</span>
-    <h2>Ich will das oefter machen &mdash; was nun?</h2>
-    <p>Jetzt kam der spannende Teil. Ich wollte das nicht jedes Mal manuell machen:</p>
+    <span class="tag tag-story">Weitergedacht</span>
+    <h2>Ich will das oefter machen</h2>
+    <p>Jetzt kam der spannende Teil. Ich wollte das nicht jedes Mal von vorne erklaeren:</p>
     <div class="chat">
-      <div><div class="msg-label">Ich</div><div class="msg msg-user">Ich moechte so etwas oefter machen. Audiodateien transkribieren und die Texte dann per AI checken lassen. Was waere best practice? Ein Skill?</div></div>
-      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Ja, ein Skill ist hier die beste Wahl! Damit kannst du z.B. <strong>/transcribe ~/aufnahmen</strong> aufrufen und er transkribiert alle Dateien und analysiert sie.</div></div>
+      <div><div class="msg-label">Ich</div><div class="msg msg-user">Ich moechte so etwas oefter machen. Audiodateien transkribieren und dann per AI checken lassen. Geht das einfacher?</div></div>
+      <div><div class="msg-label">Claude</div><div class="msg msg-claude">Klar! Ich kann dir einen wiederverwendbaren Ablauf bauen. Dann sagst du nur noch wo die Dateien liegen &mdash; den Rest mache ich automatisch.</div></div>
     </div>
-    <p>Claude hat dann nachgefragt, was genau ich brauche &mdash; Analyse-Art, Formate, Output-Format, Modellgroesse.</p>
+    <p>Claude hat nachgefragt, was genau ich brauche &mdash; welche Analyse, welche Formate, wie das Ergebnis aussehen soll.</p>
     <div class="nav">
       <button class="btn btn-prev" onclick="go(4)">&larr;</button>
       <span class="counter" id="counter-5"></span>
@@ -159,23 +159,19 @@
   </div>
 </div>
 
-<!-- 6: Was ist ein Skill -->
+<!-- 6: Das Prinzip -->
 <div class="slide" id="slide-6">
   <div class="card">
-    <span class="tag tag-claude">Erklaerung</span>
-    <h2>Was ist ein "Skill"?</h2>
-    <p>Ein Skill ist wie ein <strong>Kurzbefehl</strong> fuer Claude Code. Statt jedes Mal alles zu erklaeren, tippst du einfach:</p>
-    <div class="highlight" style="font-family: monospace; color: #4ade80; text-align: center; font-size: 18px;">
-      /transcribe ~/Desktop/aufnahmen
-    </div>
-    <p>Und Claude weiss sofort:</p>
+    <span class="tag tag-result">Das Prinzip</span>
+    <h2>So funktioniert das</h2>
     <div class="highlight">
-      &#10095; Welches Tool er nutzen soll (Whisper)<br>
-      &#10095; Welche Einstellungen (Modell, Sprache)<br>
-      &#10095; Was er mit dem Ergebnis machen soll (AI-Analyse)<br>
-      &#10095; Wo er die Ergebnisse speichern soll
+      <strong>1.</strong> Du sagst, was du willst &mdash; in normaler Sprache<br><br>
+      <strong>2.</strong> Claude fragt nach, wenn etwas unklar ist<br><br>
+      <strong>3.</strong> Claude setzt es um &mdash; installiert, baut, testet<br><br>
+      <strong>4.</strong> Du sagst, was nicht passt &mdash; Claude verbessert<br><br>
+      <strong>5.</strong> Claude merkt sich deine Vorlieben fuer naechstes Mal
     </div>
-    <p>Claude erstellt den Skill fuer dich &mdash; du musst ihn nicht programmieren.</p>
+    <p>Du brauchst <strong>kein IT-Know-how</strong>. Du musst nur wissen, <em>was</em> du willst. Claude kuemmert sich um das <em>Wie</em>.</p>
     <div class="nav">
       <button class="btn btn-prev" onclick="go(5)">&larr;</button>
       <span class="counter" id="counter-6"></span>
@@ -184,19 +180,20 @@
   </div>
 </div>
 
-<!-- 7: Das Prinzip -->
+<!-- 7: Weitere Beispiele -->
 <div class="slide" id="slide-7">
   <div class="card">
-    <span class="tag tag-result">Das Prinzip</span>
-    <h2>So arbeitet man mit Claude Code</h2>
+    <span class="tag tag-claude">Nicht nur Audio</span>
+    <h2>Was man noch so machen kann</h2>
+    <p>Das Gleiche Prinzip funktioniert fuer alles Moegliche:</p>
     <div class="highlight">
-      <strong>1.</strong> Sag was du willst &mdash; in normaler Sprache<br><br>
-      <strong>2.</strong> Claude fragt nach, wenn etwas unklar ist<br><br>
-      <strong>3.</strong> Claude setzt es um &mdash; installiert, programmiert, testet<br><br>
-      <strong>4.</strong> Du sagst, was nicht passt &mdash; Claude verbessert<br><br>
-      <strong>5.</strong> Wenns oefter gebraucht wird &rarr; Skill erstellen lassen
+      &#10095; <strong>"Sortiere meine Fotos nach Datum in Ordner"</strong><br><br>
+      &#10095; <strong>"Fasse mir diese 3 PDFs zusammen"</strong><br><br>
+      &#10095; <strong>"Erstelle eine Excel-Tabelle aus diesen Daten"</strong><br><br>
+      &#10095; <strong>"Benenne alle Dateien in diesem Ordner um"</strong><br><br>
+      &#10095; <strong>"Analysiere diese CSV und zeig mir Trends"</strong>
     </div>
-    <p>Du brauchst <strong>kein IT-Know-how</strong>. Du musst nur wissen, was du willst. Claude kuemmert sich um das Wie.</p>
+    <p>Einfach beschreiben, was du brauchst. Claude findet den Weg.</p>
     <div class="nav">
       <button class="btn btn-prev" onclick="go(6)">&larr;</button>
       <span class="counter" id="counter-7"></span>
@@ -210,15 +207,15 @@
   <div class="card">
     <span class="emoji">&#128640;</span>
     <h2>Probier es selbst aus, Nico!</h2>
-    <p>Alles, was du brauchst:</p>
+    <p>Alles was du brauchst:</p>
     <div class="highlight">
-      <strong>1.</strong> Installiere Claude Code auf deinem Mac<br>
-      &nbsp;&nbsp;&nbsp;&rarr; <span style="color:#4ade80;">Terminal oeffnen, dann:</span> <span style="font-family:monospace;color:#ff6b00;">npm install -g @anthropic-ai/claude-code</span><br><br>
-      <strong>2.</strong> Starte Claude Code<br>
-      &nbsp;&nbsp;&nbsp;&rarr; <span style="font-family:monospace;color:#ff6b00;">claude</span> im Terminal eingeben<br><br>
+      <strong>1.</strong> Lade die <strong>Claude Desktop App</strong> herunter<br>
+      &nbsp;&nbsp;&nbsp;&rarr; <span style="color:#4ade80;">claude.ai/download</span><br><br>
+      <strong>2.</strong> Oeffne die App und melde dich an<br><br>
       <strong>3.</strong> Sag einfach, was du willst<br>
       &nbsp;&nbsp;&nbsp;&rarr; z.B. <em>"Ich habe MP3-Dateien auf dem Desktop, die moechte ich als Text"</em>
     </div>
+    <p>Kein Terminal. Keine Befehle. Einfach die App oeffnen und losreden.</p>
     <p style="color:#4ade80; font-weight: 600; margin-top: 20px;">Claude macht den Rest.</p>
     <div class="nav">
       <button class="btn btn-prev" onclick="go(7)">&larr;</button>
