@@ -249,6 +249,11 @@ function render(points){
   const pfCls=lossAbs===0?(sumWin>0?'pos':''):(pf>=1?'pos':'neg');
   const crv=avgLoss>0?(avgWin/avgLoss):(avgWin>0?Infinity:0);
   const crvStr=avgLoss>0?crv.toFixed(2):(avgWin>0?'∞':'—');
+  // Allzeit-Hoch/Tief der Netto-Kurve (inkl. Startpunkt 0 vor dem ersten Trade)
+  const netVals=points.map(p=>p.KumNetto);
+  const minNet=Math.min(0,...netVals), maxNet=Math.max(0,...netVals);
+  const sinceLow=last.KumNetto-minNet;   // >= 0: Erholung seit Tiefpunkt
+  const sinceHigh=last.KumNetto-maxNet;  // <= 0: aktueller Rueckgang vom Hoch
 
   document.getElementById('subline').textContent =
     `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} Trades`;
@@ -264,6 +269,8 @@ function render(points){
     ['Ø Gewinn / Verlust', `${eur(avgWin)} / ${eur(-avgLoss)}`, '', 'CRV '+crvStr],
     ['Ø pro Trade', eur(avgTrade), clsv(avgTrade)],
     ['Gezahlte Steuern', eur(taxes), ''],
+    ['Profit seit Allzeittief', eur(sinceLow), 'pos', 'Tief '+eur(minNet)],
+    ['Verlust seit Allzeithoch', eur(sinceHigh), sinceHigh<0?'neg':'', 'Hoch '+eur(maxNet)],
   ];
   stats.innerHTML = cards.map(c=>
     `<div class="card"><div class="label">${c[0]}</div>
