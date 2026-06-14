@@ -236,6 +236,20 @@ function render(points){
   const worst=points.reduce((a,b)=>b.ErgebnisNetto<a.ErgebnisNetto?b:a);
   const last=points[points.length-1];
 
+  // Kern-Kennzahlen
+  const sumWin=points.reduce((s,p)=>s+(p.ErgebnisNetto>0?p.ErgebnisNetto:0),0);
+  const sumLoss=points.reduce((s,p)=>s+(p.ErgebnisNetto<0?p.ErgebnisNetto:0),0); // <= 0
+  const lossAbs=Math.abs(sumLoss);
+  const avgWin=wins?sumWin/wins:0;
+  const avgLoss=losses?lossAbs/losses:0; // Betrag des Ø-Verlusts
+  const avgTrade=last.KumNetto/points.length;
+  const taxes=last.KumBrutto-last.KumNetto; // brutto - netto = gezahlte Steuern
+  const pf=lossAbs>0?(sumWin/lossAbs):(sumWin>0?Infinity:0);
+  const pfStr=lossAbs>0?pf.toFixed(2):(sumWin>0?'∞':'—');
+  const pfCls=lossAbs===0?(sumWin>0?'pos':''):(pf>=1?'pos':'neg');
+  const crv=avgLoss>0?(avgWin/avgLoss):(avgWin>0?Infinity:0);
+  const crvStr=avgLoss>0?crv.toFixed(2):(avgWin>0?'∞':'—');
+
   document.getElementById('subline').textContent =
     `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} Trades`;
 
@@ -246,6 +260,10 @@ function render(points){
     ['Gewinn / Verlust', wins+' / '+losses, ''],
     ['Bester Trade', eur(best.ErgebnisNetto), 'pos', best.Instrument],
     ['Schlechtester Trade', eur(worst.ErgebnisNetto), 'neg', worst.Instrument],
+    ['Profit Factor', pfStr, pfCls],
+    ['Ø Gewinn / Verlust', `${eur(avgWin)} / ${eur(-avgLoss)}`, '', 'CRV '+crvStr],
+    ['Ø pro Trade', eur(avgTrade), clsv(avgTrade)],
+    ['Gezahlte Steuern', eur(taxes), ''],
   ];
   stats.innerHTML = cards.map(c=>
     `<div class="card"><div class="label">${c[0]}</div>
