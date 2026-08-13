@@ -179,7 +179,9 @@ function importText(text){
   if(!rows.length) return [];
   const head = rows[0]; const idx={};
   head.forEach((h,i)=>idx[h.trim()]=i);
-  const cRT=idx['Record Type'], cDate=idx['Date'], cInst=idx['Instrument'], cSym=idx['Symbol'],
+  // T212 hat die Spalte ab ~08/2026 in "Date (UTC)" umbenannt -> beide akzeptieren
+  const cDate = idx['Date'] != null ? idx['Date'] : idx['Date (UTC)'];
+  const cRT=idx['Record Type'], cInst=idx['Instrument'], cSym=idx['Symbol'],
         cDir=idx['Direction'], cPos=idx['Position ID'], cOrd=idx['Order ID'],
         cGross=idx['Total result (account currency)'], cNet=idx['Total result after taxes (account currency)'];
   if(cRT==null||cDate==null) return [];
@@ -187,7 +189,9 @@ function importText(text){
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
     if((r[cRT]||'').trim()!=='Closed position') continue;
-    const dateStr=(r[cDate]||'').trim();
+    // Zeitzonen-Suffix ("+00:00"/"Z") abschneiden, sonst greift die Dedup-Key
+    // Uebereinstimmung mit aelteren Exporten nicht (gleicher Trade, andere Schreibweise)
+    const dateStr=(r[cDate]||'').trim().replace(/(?:[+-]\d{2}:?\d{2}|Z)$/,'').trim();
     let gross=num(r[cGross]); if(gross==null) gross=0;
     let net=num(r[cNet]); if(net==null) net=gross;
     const key=(r[cPos]||'')+'|'+(r[cOrd]||'')+'|'+dateStr;
