@@ -31,7 +31,8 @@
 </script>
 <style>
   :root { --bg:#0f1419; --panel:#1a2027; --panel2:#222b34; --txt:#e6edf3; --muted:#8b97a6;
-          --pos:#3fb950; --neg:#f85149; --border:#2d3640; --accent:#58a6ff; }
+          --pos:#3fb950; --neg:#f85149; --border:#2d3640; --accent:#58a6ff;
+          color-scheme:dark; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; background:var(--bg); color:var(--txt);
          font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
@@ -45,6 +46,14 @@
   button.primary { background:var(--accent); color:#06101f; border-color:var(--accent); }
   button.danger { color:var(--neg); }
   button:active { opacity:.7; }
+  .periodbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px; }
+  .chip { font:inherit; font-size:13px; font-weight:600; border:1px solid var(--border);
+          background:var(--panel); color:var(--muted); border-radius:999px; padding:8px 14px; }
+  .chip.active { background:var(--accent); color:#06101f; border-color:var(--accent); }
+  .range { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; }
+  input[type=date] { font:inherit; font-size:13px; color:var(--txt); background:var(--panel2);
+                     border:1px solid var(--border); border-radius:8px; padding:7px 10px;
+                     -webkit-appearance:none; min-height:34px; }
   .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
            gap:10px; margin-bottom:16px; }
   .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
@@ -77,6 +86,17 @@
     <button class="danger" onclick="clearAll()">Alles löschen</button>
     <input type="file" id="fileInput" multiple>
     <input type="file" id="backupInput">
+  </div>
+
+  <div class="periodbar" id="periodbar" style="display:none">
+    <button class="chip" data-preset="all">Gesamt</button>
+    <button class="chip" data-preset="ytd">Dieses Jahr</button>
+    <button class="chip" data-preset="month">Dieser Monat</button>
+    <button class="chip" data-preset="90">90 Tage</button>
+    <button class="chip" data-preset="30">30 Tage</button>
+    <button class="chip" data-preset="7">7 Tage</button>
+    <button class="chip" data-preset="custom">Eigen</button>
+    <span class="range">von <input type="date" id="fromDate"> bis <input type="date" id="toDate"></span>
   </div>
 
   <div class="stats" id="stats" style="display:none"></div>
@@ -220,14 +240,105 @@ function buildPoints(rows){
   });
 }
 
+// ---------- Zeitraum ----------
+// Gefiltert wird ueber lokale Kalendertage, beide Grenzen inklusive. Die Kennzahlen
+// und die Kurve beziehen sich dann ausschliesslich auf den gewaehlten Zeitraum
+// (Kurve startet bei 0), nicht auf den Gesamtbestand.
+const PERIOD_KEY='t212_period';
+let allRows=[];                                  // alle gespeicherten Trades
+let period={ preset:'all', from:null, to:null };  // from/to als 'YYYY-MM-DD'
+
+function loadPeriod(){
+  if(!hasLS()) return;
+  try{ const p=JSON.parse(localStorage.getItem(PERIOD_KEY)||'null'); if(p&&p.preset) period=p; }catch(e){}
+}
+function savePeriod(){
+  if(!hasLS()) return;
+  try{ localStorage.setItem(PERIOD_KEY, JSON.stringify(period)); }catch(e){}
+}
+
+const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const deDate = s => s ? s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4) : '';
+
+function presetRange(preset){
+  const today=new Date(), start=new Date();
+  switch(preset){
+    case 'ytd':   start.setMonth(0,1); break;
+    case 'month': start.setDate(1); break;
+    case '7': case '30': case '90': start.setDate(today.getDate()-(Number(preset)-1)); break;
+    default: return { from:null, to:null };       // 'all' = kein Filter
+  }
+  return { from:iso(start), to:iso(today) };
+}
+function activeRange(){
+  return period.preset==='custom' ? { from:period.from, to:period.to } : presetRange(period.preset);
+}
+function dataRange(){
+  if(!allRows.length) return { from:null, to:null };
+  let lo=Infinity, hi=-Infinity;
+  allRows.forEach(r=>{ if(r.ts<lo) lo=r.ts; if(r.ts>hi) hi=r.ts; });
+  return { from:iso(new Date(lo)), to:iso(new Date(hi)) };
+}
+function filterRows(rows){
+  const {from,to}=activeRange();
+  if(!from && !to) return rows;
+  const lo = from ? Date.parse(from+'T00:00:00')     : -Infinity;
+  const hi = to   ? Date.parse(to  +'T23:59:59.999') :  Infinity;
+  return rows.filter(r=> r.ts>=lo && r.ts<=hi);
+}
+
+function syncPeriodUI(){
+  document.querySelectorAll('.chip').forEach(b=>
+    b.classList.toggle('active', b.dataset.preset===period.preset));
+  const r=activeRange(), span=dataRange();
+  document.getElementById('fromDate').value = r.from || span.from || '';
+  document.getElementById('toDate').value   = r.to   || span.to   || '';
+}
+function setPreset(p){
+  if(p==='custom'){
+    period={ preset:'custom',
+             from:document.getElementById('fromDate').value||null,
+             to:  document.getElementById('toDate').value||null };
+  } else {
+    period={ preset:p, from:null, to:null };
+  }
+  savePeriod(); syncPeriodUI(); renderCurrent();
+}
+function onDateChange(){
+  period={ preset:'custom',
+           from:document.getElementById('fromDate').value||null,
+           to:  document.getElementById('toDate').value||null };
+  savePeriod(); syncPeriodUI(); renderCurrent();
+}
+function renderCurrent(){
+  const filtered=filterRows(allRows);
+  render(buildPoints(filtered), {
+    filtered: filtered.length!==allRows.length || period.preset!=='all',
+    allTrades: allRows.length,
+    allNet: allRows.reduce((s,r)=>s+r.net,0),
+  });
+}
+
 let chart=null;
-function render(points){
+const WELCOME=document.getElementById('empty').innerHTML;
+function render(points, meta){
+  meta = meta || { filtered:false, allTrades:points.length, allNet:0 };
   const empty=document.getElementById('empty');
   const stats=document.getElementById('stats');
   const cw=document.getElementById('chartwrap');
+  document.getElementById('periodbar').style.display = meta.allTrades ? '' : 'none';
   if(!points.length){
     empty.style.display=''; stats.style.display='none'; cw.style.display='none';
-    document.getElementById('subline').textContent='Noch keine Daten – bitte CSV-Export importieren.';
+    const r=activeRange();
+    if(meta.allTrades){
+      empty.innerHTML = '<b>Keine Trades im gewählten Zeitraum.</b><br>'+
+        'Wähle einen anderen Zeitraum oder tippe auf „Gesamt".';
+      document.getElementById('subline').textContent =
+        `Zeitraum ${deDate(r.from)||'Anfang'} – ${deDate(r.to)||'heute'}  ·  0 von ${meta.allTrades} Trades`;
+    } else {
+      empty.innerHTML = WELCOME;
+      document.getElementById('subline').textContent='Noch keine Daten – bitte CSV-Export importieren.';
+    }
     if(chart){ chart.destroy(); chart=null; }
     return;
   }
@@ -259,12 +370,15 @@ function render(points){
   const sinceLow=last.KumNetto-minNet;   // >= 0: Erholung seit Tiefpunkt
   const sinceHigh=last.KumNetto-maxNet;  // <= 0: aktueller Rueckgang vom Hoch
 
-  document.getElementById('subline').textContent =
-    `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} Trades`;
+  const f=meta.filtered;
+  document.getElementById('subline').textContent = f
+    ? `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} von ${meta.allTrades} Trades im Zeitraum`
+    : `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} Trades`;
 
   const cards=[
-    ['Endstand netto', eur(last.KumNetto), clsv(last.KumNetto)],
-    ['Endstand brutto', eur(last.KumBrutto), clsv(last.KumBrutto)],
+    [f?'Ergebnis netto (Zeitraum)':'Endstand netto', eur(last.KumNetto), clsv(last.KumNetto),
+      f?'Gesamt '+eur(meta.allNet):''],
+    [f?'Ergebnis brutto (Zeitraum)':'Endstand brutto', eur(last.KumBrutto), clsv(last.KumBrutto)],
     ['Trefferquote', winRate+' %', ''],
     ['Gewinn / Verlust', wins+' / '+losses, ''],
     ['Bester Trade', eur(best.ErgebnisNetto), 'pos', best.Instrument],
@@ -272,9 +386,10 @@ function render(points){
     ['Profit Factor', pfStr, pfCls],
     ['Ø Gewinn / Verlust', `${eur(avgWin)} / ${eur(-avgLoss)}`, '', 'CRV '+crvStr],
     ['Ø pro Trade', eur(avgTrade), clsv(avgTrade)],
-    ['Gezahlte Steuern', eur(taxes), ''],
-    ['Profit seit Allzeittief', eur(sinceLow), 'pos', 'Tief '+eur(minNet)],
-    ['Verlust seit Allzeithoch', eur(sinceHigh), sinceHigh<0?'neg':'', 'Hoch '+eur(maxNet)],
+    [f?'Steuern im Zeitraum':'Gezahlte Steuern', eur(taxes), '',
+      f&&taxes<0?'negativ = Verlustverrechnung':''],
+    [f?'Profit seit Tief im Zeitraum':'Profit seit Allzeittief', eur(sinceLow), 'pos', 'Tief '+eur(minNet)],
+    [f?'Verlust seit Hoch im Zeitraum':'Verlust seit Allzeithoch', eur(sinceHigh), sinceHigh<0?'neg':'', 'Hoch '+eur(maxNet)],
   ];
   stats.innerHTML = cards.map(c=>
     `<div class="card"><div class="label">${c[0]}</div>
@@ -330,7 +445,18 @@ function toast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2600);
 }
-async function refresh(){ render(buildPoints(await dbGetAll())); }
+async function refresh(){
+  allRows = await dbGetAll();
+  syncPeriodUI();
+  renderCurrent();
+}
+
+document.getElementById('periodbar').addEventListener('click',(e)=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  setPreset(b.dataset.preset);
+});
+document.getElementById('fromDate').addEventListener('change', onDateChange);
+document.getElementById('toDate').addEventListener('change', onDateChange);
 
 document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const files=[...e.target.files]; if(!files.length) return;
@@ -394,7 +520,7 @@ async function clearAll(){
 }
 
 // ---------- Start ----------
-(async()=>{ idb=await openDB(); await refresh(); })();
+(async()=>{ idb=await openDB(); loadPeriod(); await refresh(); })();
 </script>
 </body>
 </html>
