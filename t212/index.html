@@ -62,6 +62,12 @@
   .pos { color:var(--pos); } .neg { color:var(--neg); }
   .chartwrap { background:var(--panel); border:1px solid var(--border); border-radius:12px;
                padding:14px; height:60vh; min-height:360px; }
+  .brushwrap { background:var(--panel); border:1px solid var(--border); border-radius:12px;
+               padding:10px 12px 8px; margin-top:10px; }
+  #mini { display:block; width:100%; height:64px; touch-action:none; cursor:ew-resize; }
+  .brushfoot { display:flex; justify-content:space-between; align-items:center; gap:8px;
+               color:var(--muted); font-size:11px; margin-top:6px; }
+  .brushfoot b { color:var(--txt); font-weight:600; }
   #empty { background:var(--panel); border:1px dashed var(--border); border-radius:12px;
            padding:40px 20px; text-align:center; color:var(--muted); }
   #empty b { color:var(--txt); }
@@ -101,6 +107,14 @@
 
   <div class="stats" id="stats" style="display:none"></div>
   <div class="chartwrap" id="chartwrap" style="display:none"><canvas id="chart"></canvas></div>
+  <div class="brushwrap" id="brushwrap" style="display:none">
+    <canvas id="mini"></canvas>
+    <div class="brushfoot">
+      <span id="brushLo"></span>
+      <span id="brushSel"></span>
+      <span id="brushHi"></span>
+    </div>
+  </div>
   <div id="empty"><b>Willkommen.</b><br>Tippe auf „＋ CSV importieren" und wähle deinen Trading-212-Export aus der Dateien-App.<br>Mehrere Dateien gleichzeitig sind möglich – Überschneidungen werden automatisch entfernt.</div>
 
   <div class="footer" id="footer">
@@ -124,12 +138,17 @@ function hasLS(){ try{ return !!window.localStorage; }catch(e){ return false; } 
 function openDB(){
   return new Promise((resolve)=>{
     if(!('indexedDB' in window)){ resolve(null); return; }
+    // Ist IndexedDB blockiert, meldet sich open() teils weder mit success noch
+    // mit error – ohne Zeitlimit wuerde die App dann gar nicht erst starten.
+    let done=false;
+    const finish = v => { if(!done){ done=true; resolve(v); } };
+    setTimeout(()=>finish(null), 2000);
     try{
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = ()=>{ req.result.createObjectStore(STORE, {keyPath:'key'}); };
-      req.onsuccess = ()=>resolve(req.result);
-      req.onerror = ()=>resolve(null);
-    }catch(e){ resolve(null); }
+      req.onsuccess = ()=>finish(req.result);
+      req.onerror = ()=>finish(null);
+    }catch(e){ finish(null); }
   });
 }
 async function dbGetAll(){
@@ -290,9 +309,19 @@ function filterRows(rows){
 function syncPeriodUI(){
   document.querySelectorAll('.chip').forEach(b=>
     b.classList.toggle('active', b.dataset.preset===period.preset));
-  const r=activeRange(), span=dataRange();
-  document.getElementById('fromDate').value = r.from || span.from || '';
-  document.getElementById('toDate').value   = r.to   || span.to   || '';
+  const r=activeRange(), ds=dataRange();
+  document.getElementById('fromDate').value = r.from || ds.from || '';
+  document.getElementById('toDate').value   = r.to   || ds.to   || '';
+  if(ds.from){
+    document.getElementById('brushLo').textContent = deDate(ds.from);
+    document.getElementById('brushHi').textContent = deDate(ds.to);
+    const s=selMs();
+    const full = (period.preset==='all');
+    document.getElementById('brushSel').innerHTML = full
+      ? '<b>Gesamter Zeitraum</b> · Fenster ziehen zum Zoomen'
+      : `<b>${deDate(iso(new Date(s.a)))} – ${deDate(iso(new Date(s.b)))}</b> · Doppeltipp = zurück`;
+  }
+  drawBrush();
 }
 function setPreset(p){
   if(p==='custom'){
@@ -305,9 +334,12 @@ function setPreset(p){
   savePeriod(); syncPeriodUI(); renderCurrent();
 }
 function onDateChange(){
-  period={ preset:'custom',
-           from:document.getElementById('fromDate').value||null,
-           to:  document.getElementById('toDate').value||null };
+  const f=document.getElementById('fromDate').value||null;
+  const t=document.getElementById('toDate').value||null;
+  const ds=dataRange();
+  // Deckt sich die Eingabe mit der ganzen Datenspanne, ist es schlicht "Gesamt"
+  const full = (!f || (ds.from && f<=ds.from)) && (!t || (ds.to && t>=ds.to));
+  period = full ? { preset:'all', from:null, to:null } : { preset:'custom', from:f, to:t };
   savePeriod(); syncPeriodUI(); renderCurrent();
 }
 function renderCurrent(){
@@ -319,14 +351,180 @@ function renderCurrent(){
   });
 }
 
+// ---------- Zeitskala: Schieber / Zoom ----------
+// Uebersichtskurve ueber den gesamten Bestand; das aufgezogene Fenster ist
+// derselbe Zeitraum, den auch Chips und Datumsfelder setzen.
+const DAY=86400000;
+let miniCurve=[];                 // [{ts, v}] kumuliert netto ueber alle Trades
+let span={lo:0, hi:0};            // Zeitachse des Schiebers (ms)
+let drag=null;                    // {mode:'left'|'right'|'move', grab}
+let raf=0;
+
+function buildMini(){
+  const sorted=allRows.slice().sort((a,b)=>a.ts-b.ts);
+  let c=0;
+  miniCurve=sorted.map(r=>({ ts:r.ts, v:(c+=r.net) }));
+  if(miniCurve.length){
+    span={ lo:miniCurve[0].ts, hi:miniCurve[miniCurve.length-1].ts };
+    if(span.hi-span.lo < DAY) span.hi = span.lo + DAY;   // Degenerierten Fall vermeiden
+  } else {
+    span={ lo:0, hi:0 };
+  }
+}
+// aktuelles Fenster in ms (immer auf die Datenspanne geklemmt)
+function selMs(){
+  const r=activeRange();
+  const a = r.from ? Math.max(span.lo, Date.parse(r.from+'T00:00:00'))     : span.lo;
+  const b = r.to   ? Math.min(span.hi, Date.parse(r.to  +'T23:59:59.999')) : span.hi;
+  return b>a ? {a,b} : {a:span.lo, b:span.hi};
+}
+function setSel(a, b){
+  a=Math.max(span.lo, Math.min(a, span.hi));
+  b=Math.max(span.lo, Math.min(b, span.hi));
+  if(b<a){ const t=a; a=b; b=t; }
+  if(b-a < DAY) b = Math.min(span.hi, a+DAY);
+  const full = (a<=span.lo && b>=span.hi);
+  period = full ? { preset:'all', from:null, to:null }
+                : { preset:'custom', from:iso(new Date(a)), to:iso(new Date(b)) };
+}
+
+function drawBrush(){
+  const c=document.getElementById('mini');
+  if(!c || !miniCurve.length) return;
+  const w=c.clientWidth, h=c.clientHeight;
+  if(!w || !h) return;
+  const dpr=window.devicePixelRatio||1;
+  if(c.width!==Math.round(w*dpr) || c.height!==Math.round(h*dpr)){
+    c.width=Math.round(w*dpr); c.height=Math.round(h*dpr);
+  }
+  const g=c.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+
+  const xOf = ts => (ts-span.lo)/(span.hi-span.lo)*w;
+  let vmin=0, vmax=0;
+  miniCurve.forEach(p=>{ if(p.v<vmin) vmin=p.v; if(p.v>vmax) vmax=p.v; });
+  if(vmax-vmin<1) vmax=vmin+1;
+  const pad=6;
+  const yOf = v => h-pad - (v-vmin)/(vmax-vmin)*(h-2*pad);
+
+  // Kurve + Flaeche
+  g.beginPath();
+  g.moveTo(xOf(miniCurve[0].ts), yOf(miniCurve[0].v));
+  miniCurve.forEach(p=>g.lineTo(xOf(p.ts), yOf(p.v)));
+  g.strokeStyle='#3fb950'; g.lineWidth=1.5; g.stroke();
+  g.lineTo(w,h); g.lineTo(0,h); g.closePath();
+  g.fillStyle='rgba(63,185,80,0.14)'; g.fill();
+  // Nulllinie
+  g.beginPath(); g.moveTo(0,yOf(0)); g.lineTo(w,yOf(0));
+  g.strokeStyle='#2d3640'; g.lineWidth=1; g.stroke();
+
+  // Auswahlfenster: aussen abdunkeln, Kanten als Griffe
+  const s=selMs(), xa=xOf(s.a), xb=xOf(s.b);
+  g.fillStyle='rgba(15,20,25,0.66)';
+  g.fillRect(0,0,Math.max(0,xa),h);
+  g.fillRect(Math.min(w,xb),0,w-xb,h);
+  g.strokeStyle='#58a6ff'; g.lineWidth=1;
+  g.strokeRect(xa+0.5,0.5,Math.max(1,xb-xa)-1,h-1);
+  g.fillStyle='#58a6ff';
+  [xa,xb].forEach(x=> g.fillRect(x-2, h/2-11, 4, 22));   // Griffe
+}
+
+function brushHit(x, w){
+  const s=selMs();
+  const xa=(s.a-span.lo)/(span.hi-span.lo)*w, xb=(s.b-span.lo)/(span.hi-span.lo)*w;
+  const tol=Math.max(14, w*0.02);
+  if(Math.abs(x-xa)<=tol) return {mode:'left'};
+  if(Math.abs(x-xb)<=tol) return {mode:'right'};
+  if(x>xa && x<xb) return {mode:'move', grab:x};
+  return {mode:'new'};
+}
+function scheduleRender(){
+  if(raf) return;
+  raf=requestAnimationFrame(()=>{ raf=0; renderCurrent(); syncPeriodUI(); });
+}
+function initBrush(){
+  const c=document.getElementById('mini');
+  const xIn = e => { const r=c.getBoundingClientRect(); return Math.max(0, Math.min(e.clientX-r.left, r.width)); };
+  const tsAt = (x,w) => span.lo + (x/w)*(span.hi-span.lo);
+
+  let lastTap=-1e9, moved=false, downX=0;
+
+  c.addEventListener('pointerdown', e=>{
+    if(!miniCurve.length) return;
+    const w=c.clientWidth, x=xIn(e), hit=brushHit(x,w), s=selMs();
+    try{ c.setPointerCapture(e.pointerId); }catch(err){}
+    moved=false; downX=x;
+    // Ein neues Fenster wird erst beim Ziehen aufgezogen – ein blosses Antippen
+    // soll den Zeitraum nicht auf einen Tag zusammenschrumpfen.
+    if(hit.mode==='new')       drag={ mode:'right', anchor:tsAt(x,w), pending:true };
+    else if(hit.mode==='move') drag={ mode:'move', grabTs:tsAt(x,w), a:s.a, b:s.b };
+    else                       drag={ mode:hit.mode, anchor:hit.mode==='left'?s.b:s.a };
+    e.preventDefault();
+  });
+  c.addEventListener('pointermove', e=>{
+    if(!drag) return;
+    const w=c.clientWidth, x=xIn(e), t=tsAt(x,w);
+    if(!moved && Math.abs(x-downX)<3) return;      // Wackler ignorieren
+    moved=true;
+    if(drag.mode==='left')       setSel(t, drag.anchor);
+    else if(drag.mode==='right') setSel(drag.anchor, t);
+    else if(drag.mode==='move'){
+      const len=drag.b-drag.a;
+      let a=drag.a+(t-drag.grabTs);
+      a=Math.max(span.lo, Math.min(a, span.hi-len));
+      setSel(a, a+len);
+    }
+    e.preventDefault(); scheduleRender();
+  });
+  const end=e=>{
+    const wasDrag=!!drag;
+    drag=null;
+    if(!wasDrag) return;
+    if(moved){ savePeriod(); return; }
+    // Ohne Bewegung war es ein Tipp: zweiter Tipp kurz danach = Zoom zurueck
+    const now=(e&&e.timeStamp)||0;
+    if(now-lastTap<320 && period.preset!=='all'){
+      period={preset:'all', from:null, to:null};
+      savePeriod(); renderCurrent(); syncPeriodUI();
+    }
+    lastTap=now;
+  };
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', end);
+  window.addEventListener('resize', ()=>drawBrush());
+}
+
 let chart=null;
+let curPoints=[], curLabels=[];   // Datenbasis der laufenden Chart-Instanz
 const WELCOME=document.getElementById('empty').innerHTML;
+
+// Achsenbeschriftung: bei kurzen Fenstern Tage statt Monate, auf ~10 Marken ausgeduennt
+function axisLabels(points){
+  const t0=Date.parse(points[0].Datum.replace(' ','T'));
+  const t1=Date.parse(points[points.length-1].Datum.replace(' ','T'));
+  const byDay=(t1-t0)<=45*DAY;
+  const out=new Array(points.length).fill('');
+  const marks=[]; let prev=null;
+  points.forEach((p,i)=>{
+    const key=byDay ? p.Datum.slice(0,10) : p.Datum.slice(0,7);
+    if(key!==prev){ prev=key; marks.push(i); }
+  });
+  const step=Math.ceil(marks.length/10)||1;
+  marks.forEach((i,k)=>{
+    if(k%step) return;
+    const d=points[i].Datum;
+    out[i]= byDay ? d.slice(8,10)+'.'+d.slice(5,7)+'.' : d.slice(5,7)+'/'+d.slice(2,4);
+  });
+  return out;
+}
 function render(points, meta){
   meta = meta || { filtered:false, allTrades:points.length, allNet:0 };
   const empty=document.getElementById('empty');
   const stats=document.getElementById('stats');
   const cw=document.getElementById('chartwrap');
   document.getElementById('periodbar').style.display = meta.allTrades ? '' : 'none';
+  document.getElementById('brushwrap').style.display = meta.allTrades>1 ? '' : 'none';
   if(!points.length){
     empty.style.display=''; stats.style.display='none'; cw.style.display='none';
     const r=activeRange();
@@ -397,20 +595,24 @@ function render(points, meta){
      ${c[3]?`<div class="label" style="margin-top:4px;text-transform:none">${c[3]}</div>`:''}</div>`
   ).join('');
 
-  const labels=points.map(p=>p.MonatLabel);
-  const dates=points.map(p=>p.Datum);
+  curPoints=points;
+  curLabels=axisLabels(points);
   const netto=points.map(p=>p.KumNetto);
   const brutto=points.map(p=>p.KumBrutto);
+
+  // Chart wird neu aufgebaut statt in place aktualisiert: Chart.js behaelt beim
+  // Austauschen der Daten sonst gelegentlich die alten Punktpositionen und
+  // zeichnet die Kurve zusammengestaucht.
+  if(chart) chart.destroy();
 
   const ctx=document.getElementById('chart').getContext('2d');
   const grad=ctx.createLinearGradient(0,0,0,500);
   grad.addColorStop(0,'rgba(63,185,80,0.28)');
   grad.addColorStop(1,'rgba(63,185,80,0.00)');
 
-  if(chart) chart.destroy();
   chart=new Chart(ctx,{
     type:'line',
-    data:{ labels:labels.map((l,i)=>i), datasets:[
+    data:{ labels:curLabels.map((l,i)=>i), datasets:[
       {label:'Kumuliert netto (nach Steuern)', data:netto, borderColor:'#3fb950',
        backgroundColor:grad, fill:true, borderWidth:2, pointRadius:0, tension:0.12},
       {label:'Kumuliert brutto (vor Steuern)', data:brutto, borderColor:'#58a6ff',
@@ -418,22 +620,22 @@ function render(points, meta){
        tension:0.12, borderDash:[5,4]},
     ]},
     options:{
-      responsive:true, maintainAspectRatio:false, animation:{duration:300},
+      responsive:true, maintainAspectRatio:false, animation:{duration:drag?0:300},
       interaction:{mode:'index', intersect:false},
       scales:{
         x:{ grid:{color:'#222b34'},
             ticks:{color:'#8b97a6', autoSkip:false, maxRotation:0,
-              callback:(v,i)=> labels[i]?labels[i]:''} },
+              callback:(v,i)=> curLabels[i]||''} },
         y:{ grid:{color:'#222b34'},
             ticks:{color:'#8b97a6', callback:v=>eur(v).replace(' €','')} },
       },
       plugins:{
         legend:{labels:{color:'#e6edf3', usePointStyle:true, boxWidth:8}},
         tooltip:{ callbacks:{
-          title:items=>`#${points[items[0].dataIndex].Nr}  ·  ${dates[items[0].dataIndex]}`,
-          afterTitle:items=>{const p=points[items[0].dataIndex];return `${p.Instrument} (${p.Richtung})`;},
+          title:items=>{const p=curPoints[items[0].dataIndex];return `#${p.Nr}  ·  ${p.Datum}`;},
+          afterTitle:items=>{const p=curPoints[items[0].dataIndex];return `${p.Instrument} (${p.Richtung})`;},
           label:item=>`${item.dataset.label}: ${eur(item.parsed.y)}`,
-          afterBody:items=>`\nTrade-Ergebnis netto: ${eur(points[items[0].dataIndex].ErgebnisNetto)}`,
+          afterBody:items=>`\nTrade-Ergebnis netto: ${eur(curPoints[items[0].dataIndex].ErgebnisNetto)}`,
         }}
       }
     }
@@ -447,8 +649,9 @@ function toast(msg){
 }
 async function refresh(){
   allRows = await dbGetAll();
-  syncPeriodUI();
+  buildMini();
   renderCurrent();
+  syncPeriodUI();
 }
 
 document.getElementById('periodbar').addEventListener('click',(e)=>{
@@ -520,7 +723,7 @@ async function clearAll(){
 }
 
 // ---------- Start ----------
-(async()=>{ idb=await openDB(); loadPeriod(); await refresh(); })();
+(async()=>{ idb=await openDB(); loadPeriod(); initBrush(); await refresh(); })();
 </script>
 </body>
 </html>
