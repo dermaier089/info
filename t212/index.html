@@ -51,9 +51,13 @@
           background:var(--panel); color:var(--muted); border-radius:999px; padding:8px 14px; }
   .chip.active { background:var(--accent); color:#06101f; border-color:var(--accent); }
   .range { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; }
-  input[type=date] { font:inherit; font-size:13px; color:var(--txt); background:var(--panel2);
+  input[type=date], input[type=number] {
+                     font:inherit; font-size:13px; color:var(--txt); background:var(--panel2);
                      border:1px solid var(--border); border-radius:8px; padding:7px 10px;
                      -webkit-appearance:none; min-height:34px; }
+  input[type=number] { width:74px; text-align:right; -moz-appearance:textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
   .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
            gap:10px; margin-bottom:16px; }
   .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
@@ -103,6 +107,13 @@
     <button class="chip" data-preset="7">7 Tage</button>
     <button class="chip" data-preset="custom">Eigen</button>
     <span class="range">von <input type="date" id="fromDate"> bis <input type="date" id="toDate"></span>
+  </div>
+
+  <div class="periodbar" id="microbar" style="display:none">
+    <button class="chip" id="microChip">Micro-Trades ausblenden</button>
+    <span class="range">Betrag unter
+      <input type="number" id="microLimit" min="0" step="0.5" inputmode="decimal"> €</span>
+    <span class="range" id="microInfo"></span>
   </div>
 
   <div class="stats" id="stats" style="display:none"></div>
@@ -267,6 +278,52 @@ const PERIOD_KEY='t212_period';
 let allRows=[];                                  // alle gespeicherten Trades
 let period={ preset:'all', from:null, to:null };  // from/to als 'YYYY-MM-DD'
 
+// ---------- Micro-Trades ----------
+// Sicherheitsausstiege (Teilschliessungen nahe null) verwaessern Trefferquote,
+// Profit Factor und Durchschnitte. Der Filter blendet sie ueberall aus: Kurve,
+// Kennzahlen und Uebersichtskurve rechnen dann so, als haetten sie nie
+// stattgefunden. Maszstab ist das Bruttoergebnis, weil die Steuer nur Gewinne
+// kleinrechnet und derselbe Trade sonst je nach Vorzeichen anders einsortiert
+// wuerde.
+const MICRO_KEY='t212_micro';
+let micro={ on:false, limit:2 };
+let baseRows=[];                                 // allRows ohne Micro-Trades
+
+function loadMicro(){
+  if(!hasLS()) return;
+  try{
+    const m=JSON.parse(localStorage.getItem(MICRO_KEY)||'null');
+    if(m && typeof m.limit==='number' && isFinite(m.limit))
+      micro={ on:!!m.on, limit:Math.max(0,m.limit) };
+  }catch(e){}
+}
+function saveMicro(){
+  if(!hasLS()) return;
+  try{ localStorage.setItem(MICRO_KEY, JSON.stringify(micro)); }catch(e){}
+}
+function isMicro(r){ return Math.abs(r.gross) < micro.limit; }
+function applyMicro(){
+  baseRows = (micro.on && micro.limit>0) ? allRows.filter(r=>!isMicro(r)) : allRows.slice();
+}
+function syncMicroUI(){
+  document.getElementById('microChip').classList.toggle('active', micro.on);
+  const inp=document.getElementById('microLimit');
+  if(document.activeElement!==inp) inp.value=micro.limit;
+  const hidden=allRows.length-baseRows.length;
+  document.getElementById('microInfo').textContent = micro.on
+    ? (hidden ? hidden+' von '+allRows.length+' Trades ausgeblendet' : 'nichts darunter')
+    : '';
+}
+function setMicro(on, limit){
+  micro={ on:on, limit:limit };
+  saveMicro(); applyMicro(); buildMini();
+  renderCurrent(); syncPeriodUI(); syncMicroUI();
+}
+function readMicroLimit(){
+  const v=parseFloat((document.getElementById('microLimit').value||'').replace(',','.'));
+  return (isFinite(v) && v>=0) ? v : micro.limit;
+}
+
 function loadPeriod(){
   if(!hasLS()) return;
   try{ const p=JSON.parse(localStorage.getItem(PERIOD_KEY)||'null'); if(p&&p.preset) period=p; }catch(e){}
@@ -293,9 +350,9 @@ function activeRange(){
   return period.preset==='custom' ? { from:period.from, to:period.to } : presetRange(period.preset);
 }
 function dataRange(){
-  if(!allRows.length) return { from:null, to:null };
+  if(!baseRows.length) return { from:null, to:null };
   let lo=Infinity, hi=-Infinity;
-  allRows.forEach(r=>{ if(r.ts<lo) lo=r.ts; if(r.ts>hi) hi=r.ts; });
+  baseRows.forEach(r=>{ if(r.ts<lo) lo=r.ts; if(r.ts>hi) hi=r.ts; });
   return { from:iso(new Date(lo)), to:iso(new Date(hi)) };
 }
 function filterRows(rows){
@@ -307,7 +364,7 @@ function filterRows(rows){
 }
 
 function syncPeriodUI(){
-  document.querySelectorAll('.chip').forEach(b=>
+  document.querySelectorAll('#periodbar .chip').forEach(b=>
     b.classList.toggle('active', b.dataset.preset===period.preset));
   const r=activeRange(), ds=dataRange();
   document.getElementById('fromDate').value = r.from || ds.from || '';
@@ -343,11 +400,12 @@ function onDateChange(){
   savePeriod(); syncPeriodUI(); renderCurrent();
 }
 function renderCurrent(){
-  const filtered=filterRows(allRows);
+  const filtered=filterRows(baseRows);
   render(buildPoints(filtered), {
-    filtered: filtered.length!==allRows.length || period.preset!=='all',
-    allTrades: allRows.length,
-    allNet: allRows.reduce((s,r)=>s+r.net,0),
+    filtered: filtered.length!==baseRows.length || period.preset!=='all',
+    allTrades: baseRows.length,
+    allNet: baseRows.reduce((s,r)=>s+r.net,0),
+    microHidden: allRows.length-baseRows.length,
   });
 }
 
@@ -361,7 +419,7 @@ let drag=null;                    // {mode:'left'|'right'|'move', grab}
 let raf=0;
 
 function buildMini(){
-  const sorted=allRows.slice().sort((a,b)=>a.ts-b.ts);
+  const sorted=baseRows.slice().sort((a,b)=>a.ts-b.ts);
   let c=0;
   miniCurve=sorted.map(r=>({ ts:r.ts, v:(c+=r.net) }));
   if(miniCurve.length){
@@ -519,16 +577,25 @@ function axisLabels(points){
   return out;
 }
 function render(points, meta){
-  meta = meta || { filtered:false, allTrades:points.length, allNet:0 };
+  meta = meta || { filtered:false, allTrades:points.length, allNet:0, microHidden:0 };
   const empty=document.getElementById('empty');
   const stats=document.getElementById('stats');
   const cw=document.getElementById('chartwrap');
-  document.getElementById('periodbar').style.display = meta.allTrades ? '' : 'none';
+  // An allRows festgemacht, nicht an meta.allTrades: sonst raeumte der
+  // Micro-Filter im Extremfall die Bedienelemente weg, mit denen man ihn wieder
+  // loswird.
+  document.getElementById('periodbar').style.display = allRows.length ? '' : 'none';
+  document.getElementById('microbar').style.display  = allRows.length ? '' : 'none';
   document.getElementById('brushwrap').style.display = meta.allTrades>1 ? '' : 'none';
   if(!points.length){
     empty.style.display=''; stats.style.display='none'; cw.style.display='none';
     const r=activeRange();
-    if(meta.allTrades){
+    if(!meta.allTrades && meta.microHidden){
+      empty.innerHTML = '<b>Alle Trades gelten als Micro-Trade.</b><br>'+
+        'Setze die Grenze niedriger oder schalte den Filter aus.';
+      document.getElementById('subline').textContent =
+        `0 von ${allRows.length} Trades  ·  ${meta.microHidden} unter ${eur(micro.limit)}`;
+    } else if(meta.allTrades){
       empty.innerHTML = '<b>Keine Trades im gewählten Zeitraum.</b><br>'+
         'Wähle einen anderen Zeitraum oder tippe auf „Gesamt".';
       document.getElementById('subline').textContent =
@@ -569,9 +636,11 @@ function render(points, meta){
   const sinceHigh=last.KumNetto-maxNet;  // <= 0: aktueller Rueckgang vom Hoch
 
   const f=meta.filtered;
-  document.getElementById('subline').textContent = f
+  const microNote = meta.microHidden
+    ? `  ·  ${meta.microHidden} Micro-Trades unter ${eur(micro.limit)} ausgeblendet` : '';
+  document.getElementById('subline').textContent = (f
     ? `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} von ${meta.allTrades} Trades im Zeitraum`
-    : `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} Trades`;
+    : `${points[0].Datum}  bis  ${last.Datum}  ·  ${points.length} Trades`) + microNote;
 
   const cards=[
     [f?'Ergebnis netto (Zeitraum)':'Endstand netto', eur(last.KumNetto), clsv(last.KumNetto),
@@ -649,15 +718,26 @@ function toast(msg){
 }
 async function refresh(){
   allRows = await dbGetAll();
+  applyMicro();
   buildMini();
   renderCurrent();
   syncPeriodUI();
+  syncMicroUI();
 }
 
 document.getElementById('periodbar').addEventListener('click',(e)=>{
   const b=e.target.closest('.chip'); if(!b) return;
   setPreset(b.dataset.preset);
 });
+document.getElementById('microChip').addEventListener('click', ()=>{
+  setMicro(!micro.on, readMicroLimit());
+});
+document.getElementById('microLimit').addEventListener('change', ()=>{
+  const v=readMicroLimit();
+  // Wer eine Grenze eintippt, meint den Filter – also gleich mitschalten.
+  setMicro(v>0, v);
+});
+
 document.getElementById('fromDate').addEventListener('change', onDateChange);
 document.getElementById('toDate').addEventListener('change', onDateChange);
 
@@ -723,7 +803,7 @@ async function clearAll(){
 }
 
 // ---------- Start ----------
-(async()=>{ idb=await openDB(); loadPeriod(); initBrush(); await refresh(); })();
+(async()=>{ idb=await openDB(); loadPeriod(); loadMicro(); initBrush(); await refresh(); })();
 </script>
 </body>
 </html>
