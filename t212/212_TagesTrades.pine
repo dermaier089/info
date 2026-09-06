@@ -1,0 +1,115 @@
+//@version=5
+// Trading 212 - Tages-Trades auf dem TradingView-Chart
+// ----------------------------------------------------
+// Einmalige Einrichtung:
+//   1. TradingView -> Pine Editor -> Inhalt dieser Datei einfuegen -> "Zum Chart hinzufuegen"
+//   2. Chart auf den passenden Future stellen (TECH100 -> NQ1! bzw. MNQ1!)
+// Taeglicher Ablauf:
+//   1. In 212_Tag.html den Tag waehlen und auf "TV-Export" klicken (kopiert den Datenstring)
+//   2. Hier: Indikator-Einstellungen oeffnen -> String ins Feld "Trade-Daten" einfuegen -> OK
+// Ergebnis-Labels erscheinen als Callouts oberhalb des Tageshochs, mit gepunkteter
+// Linie zur Ausstiegskerze (wie in 212_Tag.html); alternativ direkt am Ausstieg.
+indicator("212 Tages-Trades", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+data    = input.text_area("", "Trade-Daten (Knopf 'TV-Export' in 212_Tag.html)")
+useOff  = input.bool(true,  "CFD-Offset aus Export anwenden")
+addOff  = input.float(0.0,  "Zusatz-Offset (Punkte)", step = 0.25)
+showLbl = input.bool(true,  "Ergebnis-Labels zeigen", group = "Labels")
+lblTop  = input.bool(true,  "als Callouts oberhalb (sonst am Ausstieg)", group = "Labels")
+gapMin  = input.int(25,     "Callout-Mindestabstand (Minuten)", minval = 1, group = "Labels")
+maxLane = input.int(8,      "max. Callout-Ebenen", minval = 1, maxval = 20, group = "Labels")
+hideMic = input.bool(false, "Micro-Trades ausblenden", group = "Filter")
+micPts  = input.float(5.0,  "Micro-Schwelle (Punkte)", minval = 0, step = 0.5, group = "Filter")
+
+// --- Datenstring einmalig parsen (v1|offset|open,close,L/S,units,entry,exit,gross;...) ---
+var float[] aO = array.new_float()   // Open-Zeit (ms UTC)
+var float[] aC = array.new_float()   // Close-Zeit (ms UTC)
+var bool[]  aL = array.new_bool()    // Long?
+var float[] aU = array.new_float()   // Kontrakte
+var float[] aE = array.new_float()   // Entry (CFD)
+var float[] aX = array.new_float()   // Exit (CFD)
+var float[] aG = array.new_float()   // Ergebnis EUR brutto
+var float[] aR = array.new_float()   // Anfangsrisiko in Punkten (na wenn unbekannt)
+var float   dOff    = 0.0
+var float   minOpen = na
+var float   pMax    = na
+if barstate.isfirst and str.length(data) > 0
+    parts = str.split(data, "|")
+    if array.size(parts) >= 3
+        dOff := nz(str.tonumber(array.get(parts, 1)))
+        trs = str.split(array.get(parts, 2), ";")
+        for i = 0 to array.size(trs) - 1
+            f = str.split(array.get(trs, i), ",")
+            if array.size(f) >= 7
+                tO = 1000.0 * str.tonumber(array.get(f, 0))
+                tC = 1000.0 * str.tonumber(array.get(f, 1))
+                pE = str.tonumber(array.get(f, 4))
+                pX = str.tonumber(array.get(f, 5))
+                array.push(aO, tO)
+                array.push(aC, tC)
+                array.push(aL, array.get(f, 2) == "L")
+                array.push(aU, nz(str.tonumber(array.get(f, 3)), 1))
+                array.push(aE, pE)
+                array.push(aX, pX)
+                array.push(aG, nz(str.tonumber(array.get(f, 6))))
+                array.push(aR, array.size(f) >= 8 ? str.tonumber(array.get(f, 7)) : na)
+                minOpen := na(minOpen) ? tO : math.min(minOpen, tO)
+                pMax    := na(pMax) ? math.max(pE, pX) : math.max(pMax, math.max(pE, pX))
+
+// --- Preisspanne ab Beginn des Trade-Zeitraums beobachten (fuer die Callout-Hoehe) ---
+var float hiMax = na
+var float loMin = na
+if not na(minOpen) and time >= int(minOpen) - 3600000
+    hiMax := na(hiMax) ? high : math.max(hiMax, high)
+    loMin := na(loMin) ? low  : math.min(loMin, low)
+
+// --- Zeichnen (einmalig am letzten Bar) ---
+var bool done = false
+if barstate.islast and not done and array.size(aO) > 0
+    done := true
+    off  = (useOff ? dOff : 0.0) + addOff
+    rng  = na(hiMax) or na(loMin) ? math.max(pMax * 0.01, 10.0) : hiMax - loMin
+    base = (na(hiMax) ? pMax - off : hiMax) + rng * 0.05
+    step = rng * 0.05
+    laneT = array.new_float(maxLane, -1.0e15)   // letzte Callout-Zeit je Ebene
+    for i = 0 to array.size(aO) - 1
+        tO   = int(array.get(aO, i))
+        tC   = int(array.get(aC, i))
+        isL  = array.get(aL, i)
+        un   = array.get(aU, i)
+        pE   = array.get(aE, i) - off
+        pX   = array.get(aX, i) - off
+        gr   = array.get(aG, i)
+        pts  = (pX - pE) * (isL ? 1 : -1)
+        if hideMic and math.abs(pts) < micPts
+            continue
+        col  = gr >= 0 ? color.new(color.green, 0) : color.new(color.red, 0)
+        dCol = isL ? color.green : color.red
+        line.new(tO, pE, tC, pX, xloc = xloc.bar_time, color = col, width = 2)
+        // Einstiegsmarker unter der Kerze: ▲ gruen = Long, ▼ rot = Short
+        // (den genauen Entry-Preis zeigt ohnehin der Startpunkt der Trade-Linie)
+        label.new(tO, 0, isL ? "▲" : "▼", xloc = xloc.bar_time, yloc = yloc.belowbar,
+             style = label.style_none, textcolor = dCol, size = size.small)
+        if showLbl
+            risk = array.get(aR, i)
+            rMul = na(risk) or risk <= 0 ? na : pts / risk
+            txt = str.tostring(un, "#.##") + "× · " + (pts >= 0 ? "+" : "") + str.tostring(pts, "#.#") + " P · " +
+                 (gr >= 0 ? "+" : "") + str.tostring(gr, "#.##") + " €" +
+                 (na(rMul) ? "" : " · " + (rMul >= 0 ? "+" : "") + str.tostring(rMul, "#.#") + "R")
+            if lblTop
+                lane = maxLane - 1
+                for j = 0 to maxLane - 1
+                    if tC - array.get(laneT, j) > gapMin * 60000
+                        lane := j
+                        break
+                array.set(laneT, lane, tC)
+                y = base + lane * step
+                line.new(tC, pX, tC, y, xloc = xloc.bar_time,
+                     color = color.new(col, 45), style = line.style_dotted, width = 1)
+                label.new(tC, y, txt, xloc = xloc.bar_time,
+                     style = label.style_label_down, color = color.new(col, 80),
+                     textcolor = col, size = size.small)
+            else
+                label.new(tC, pX, txt, xloc = xloc.bar_time,
+                     style = gr >= 0 ? label.style_label_down : label.style_label_up,
+                     color = color.new(col, 80), textcolor = col, size = size.small)

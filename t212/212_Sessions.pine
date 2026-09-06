@@ -1,0 +1,55 @@
+//@version=5
+// Trading 212 - Session-Hintergrund (Pre-Market / US-Hauptsession / Tagesgrenzen)
+// -------------------------------------------------------------------------------
+// Einrichtung: Pine Editor -> einfuegen -> "Zum Chart hinzufuegen".
+// Alle Zeiten beziehen sich auf die eingestellte Zeitzone (Standard: Europe/Berlin),
+// Sommer-/Winterzeit macht TradingView automatisch. Funktioniert auf Intraday-Charts.
+// Sessions (deutsche Zeit):
+//   Pre-Market frueh 10:00-14:00  (offizieller US-Fruehhandel ab 04:00 ET, ruhig)
+//   Pre-Market heiss 14:00-15:30  (US-Desks aktiv, 14:30 Makro-Daten)
+//   US-Hauptsession  15:30-22:00  (RTH 09:30-16:00 ET)
+//   Tagesgrenze      gepunktete Linie um 00:00
+indicator("212 Sessions", overlay = true, max_lines_count = 500)
+
+tz      = input.string("Europe/Berlin", "Zeitzone")
+
+showPre = input.bool(true, "Pre-Market früh einfärben", group = "Pre-Market früh")
+preSess = input.session("1000-1400", "Zeitraum", group = "Pre-Market früh")
+preCol  = input.color(color.new(#58a6ff, 95), "Farbe", group = "Pre-Market früh")
+
+showHot = input.bool(true, "Pre-Market heiß einfärben", group = "Pre-Market heiß")
+hotSess = input.session("1400-1530", "Zeitraum", group = "Pre-Market heiß")
+hotCol  = input.color(color.new(#58a6ff, 88), "Farbe", group = "Pre-Market heiß")
+
+showRth = input.bool(true, "US-Hauptsession einfärben", group = "US-Hauptsession")
+rthSess = input.session("1530-2200", "Zeitraum", group = "US-Hauptsession")
+rthCol  = input.color(color.new(#e3b341, 92), "Farbe", group = "US-Hauptsession")
+
+showDay = input.bool(true, "Tagesgrenze (00:00) markieren", group = "Tagesgrenzen")
+dayCol  = input.color(color.new(color.gray, 40), "Linienfarbe", group = "Tagesgrenzen")
+
+showNews = input.bool(true, "14:30-Linie (US-Wirtschaftsdaten)", group = "Wirtschaftsdaten")
+newsMin  = input.int(870, "Uhrzeit in Minuten ab 00:00 (870 = 14:30)", minval = 0, maxval = 1439, group = "Wirtschaftsdaten")
+newsCol  = input.color(color.new(color.red, 45), "Linienfarbe", group = "Wirtschaftsdaten")
+
+inSess(s) => not na(time(timeframe.period, s, tz))
+
+bgcolor(showPre and inSess(preSess) ? preCol : na)
+bgcolor(showHot and inSess(hotSess) ? hotCol : na)
+bgcolor(showRth and inSess(rthSess) ? rthCol : na)
+
+// Vertikale gepunktete Linie am ersten Bar des neuen (lokalen) Tages
+d = dayofmonth(time, tz)
+newDay = timeframe.isintraday and not na(d[1]) and d != d[1]
+if showDay and newDay
+    line.new(bar_index, low, bar_index, high, extend = extend.both,
+         color = dayCol, style = line.style_dotted, width = 1)
+
+// 14:30-Linie: exakter Zeitstempel, auch wenn die Bar-Groesse groeber als 1 Minute ist
+mLocal = hour(time, tz) * 60 + minute(time, tz)
+tfMin  = timeframe.in_seconds() / 60
+crossNews = timeframe.isintraday and mLocal <= newsMin and newsMin < mLocal + tfMin
+if showNews and crossNews
+    tNews = timestamp(tz, year(time, tz), month(time, tz), dayofmonth(time, tz), math.floor(newsMin / 60), newsMin % 60)
+    line.new(tNews, low, tNews, high, xloc = xloc.bar_time, extend = extend.both,
+         color = newsCol, style = line.style_dashed, width = 1)
